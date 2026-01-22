@@ -1,0 +1,49 @@
+export function MenuIcon({ className = "w-5 h-5", size = 20 }: { className?: string; size?: number }) {
+  return (
+    <svg 
+      className={className}
+      width={size}
+      height={size}
+      viewBox="0 0 20 20" 
+      fill="none" 
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <rect 
+        x="0.75" 
+        y="12" 
+        width="7.25" 
+        height="7.25" 
+        rx="2.58333" 
+        stroke="currentColor" 
+        strokeWidth="1.5"
+      />
+      <rect 
+        x="0.75" 
+        y="0.75" 
+        width="7.25" 
+        height="7.25" 
+        rx="2.58333" 
+        stroke="currentColor" 
+        strokeWidth="1.5"
+      />
+      <rect 
+        x="12" 
+        y="12" 
+        width="7.25" 
+        height="7.25" 
+        rx="2.58333" 
+        stroke="currentColor" 
+        strokeWidth="1.5"
+      />
+      <rect 
+        x="12" 
+        y="0.75" 
+        width="7.25" 
+        height="7.25" 
+        rx="2.58333" 
+        stroke="currentColor" 
+        strokeWidth="1.5"
+      />
+    </svg>
+  );
+}
