@@ -42,3 +42,9 @@ lerna-debug.log*
 
 # OS
 Thumbs.db
+
+# Large video files
+*.mp4
+*.mov
+*.avi
+src/assets/wallpaper3.mp4
