@@ -94,12 +94,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  // Check session on mount
+  // Check session on mount (use isAuthenticated to respect expiration)
   useEffect(() => {
-    const sessionId = getSessionId();
     setAuthState(prev => ({
       ...prev,
-      isAuthenticated: !!sessionId,
+      isAuthenticated: isAuthenticated(),
     }));
   }, []);
 

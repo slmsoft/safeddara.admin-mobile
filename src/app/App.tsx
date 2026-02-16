@@ -78,8 +78,13 @@ interface SavedCard {
   cardType: string;
 }
 
+function formatTicketNumber(rawId: string | number): string {
+  const s = String(rawId);
+  return s.length > 12 ? s.replace(/-/g, '').slice(-6).toUpperCase() : s;
+}
+
 function AppContent() {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, logout } = useAuth();
   
   // Check if registration is completed (intro removed - show registration directly)
   const [showRegistration, setShowRegistration] = useState(() => {
@@ -96,6 +101,7 @@ function AppContent() {
   
   // Login page state
   const [showLogin, setShowLogin] = useState(false);
+  const [loginFromMainApp, setLoginFromMainApp] = useState(false);
   
   // Update registration state when auth changes
   useEffect(() => {
@@ -140,9 +146,10 @@ function AppContent() {
               payment_paid: 'paid', payment_failed: 'cancelled', payment_pending: 'pending',
               paid: 'paid', cancelled: 'cancelled',
             };
+            const rawId = payment.orderId || payment.id || `order-${Date.now()}`;
             return {
-              id: payment.orderId || payment.id || `order-${Date.now()}`,
-              orderNumber: String(payment.orderId ?? payment.id ?? ''),
+              id: rawId,
+              orderNumber: formatTicketNumber(rawId),
               items,
               total: Number(total),
               status: statusMap[payment.status] ?? 'pending',
@@ -273,18 +280,13 @@ function AppContent() {
     setPendingHotelBooking(null);
   };
   
-  // Handle logout - clear registration and return to registration
+  // Handle logout - clear session only, keep profile data for re-login
   const handleLogout = () => {
-    // Clear all registration data
+    logout(); // Clear session (AuthContext)
+    // Keep userName, userEmail, userPhone — so after re-login profile shows correctly
     localStorage.removeItem('isRegistered');
-    localStorage.removeItem('userName');
-    localStorage.removeItem('userPhone');
-    localStorage.removeItem('userEmail');
     
-    // Reset state to show registration
     setShowRegistration(true);
-    
-    // Close all modals and reset to home
     closeAllModals();
     setCurrentPage('home');
   };
@@ -524,9 +526,10 @@ function AppContent() {
                     payment_paid: 'paid', payment_failed: 'cancelled', payment_pending: 'pending',
                     paid: 'paid', cancelled: 'cancelled', canceled: 'cancelled',
                   };
+                  const rawId = p.orderId || p.id || `order-${Date.now()}`;
                   return {
-                    id: p.orderId || p.id || `order-${Date.now()}`,
-                    orderNumber: String(p.orderId ?? p.id ?? ''),
+                    id: rawId,
+                    orderNumber: formatTicketNumber(rawId),
                     items: [{ id: '1', name: p.orderType || 'Услуга', categoryName: 'Услуга', price: total, quantity: 1, date: p.date ? new Date(p.date).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '', image: '', description: '' }],
                     total: Number(total),
                     status: statusMap[p.status] ?? 'pending',
@@ -604,11 +607,12 @@ function AppContent() {
       <LoginPage
         onBack={() => {
           setShowLogin(false);
-          setShowRegistration(true);
+          if (!loginFromMainApp) setShowRegistration(true);
         }}
         onSuccess={() => {
           setShowLogin(false);
           setShowRegistration(false);
+          setLoginFromMainApp(false);
         }}
       />
     );
@@ -623,6 +627,7 @@ function AppContent() {
         }}
         onSwitchToLogin={() => {
           setShowRegistration(false);
+          setLoginFromMainApp(false);
           setShowLogin(true);
         }}
       />
@@ -707,14 +712,17 @@ function AppContent() {
                 if (payResponse.success && payResponse.data && typeof payResponse.data === 'object') {
                   const userPayments = (payResponse.data as any).userPayments;
                   if (Array.isArray(userPayments)) {
-                    const mapped = userPayments.map((p: any) => ({
-                      id: p.orderId || p.id || `order-${Date.now()}`,
-                      orderNumber: p.orderId || String(p.id || ''),
-                      items: [{ id: '1', name: p.orderType || 'Услуга', categoryName: 'Услуга', price: p.totalPrice ?? p.totalAmount ?? 0, quantity: 1, date: p.date ? new Date(p.date).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '', image: '', description: '' }],
-                      total: p.totalPrice ?? p.totalAmount ?? 0,
-                      status: (p.status === 'payment_paid' || p.status === 'paid') ? 'paid' : p.status === 'canceled' ? 'cancelled' : 'pending',
-                      createdAt: p.date ? new Date(p.date).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : new Date().toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
-                    }));
+                    const mapped = userPayments.map((p: any) => {
+                      const rawId = p.orderId || p.id || `order-${Date.now()}`;
+                      return {
+                        id: rawId,
+                        orderNumber: formatTicketNumber(rawId),
+                        items: [{ id: '1', name: p.orderType || 'Услуга', categoryName: 'Услуга', price: p.totalPrice ?? p.totalAmount ?? 0, quantity: 1, date: p.date ? new Date(p.date).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '', image: '', description: '' }],
+                        total: p.totalPrice ?? p.totalAmount ?? 0,
+                        status: (p.status === 'payment_paid' || p.status === 'paid') ? 'paid' : p.status === 'canceled' ? 'cancelled' : 'pending',
+                        createdAt: p.date ? new Date(p.date).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : new Date().toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
+                      };
+                    });
                     setOrders(mapped);
                   }
                 }
@@ -938,6 +946,12 @@ function AppContent() {
             }}
             onAddCard={handleAddCard}
             savedCards={savedCards}
+            onNeedLogin={() => {
+              setShowAddCard(false);
+              setShowPaymentMethods(false);
+              setLoginFromMainApp(true);
+              setShowLogin(true);
+            }}
             onWeatherClick={() => setShowWeather(true)}
             onLiveClick={() => setShowCameras(true)}
           />
@@ -1427,7 +1441,19 @@ function AppContent() {
        !showRegistration && (
         <ModernBottomNav
           activeTab={currentPage}
-          onTabChange={(tab) => setCurrentPage(tab)}
+          onTabChange={(tab) => {
+            setShowMyTickets(false);
+            setShowPurchaseHistory(false);
+            setShowPaymentMethods(false);
+            setShowAddCard(false);
+            setShowFavorites(false);
+            setShowSettings(false);
+            setShowFeedback(false);
+            setShowNotifications(false);
+            setShowMyBookings(false);
+            setShowBookingDetails(false);
+            setCurrentPage(tab);
+          }}
         />
       )}
     </>
