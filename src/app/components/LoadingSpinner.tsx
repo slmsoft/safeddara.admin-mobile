@@ -1,13 +1,22 @@
-export function LoadingSpinner() {
+// Loading spinner component
+
+interface LoadingSpinnerProps {
+  size?: 'sm' | 'md' | 'lg';
+  className?: string;
+}
+
+export function LoadingSpinner({ size = 'md', className = '' }: LoadingSpinnerProps) {
+  const sizeClasses = {
+    sm: 'w-4 h-4',
+    md: 'w-8 h-8',
+    lg: 'w-12 h-12',
+  };
+
   return (
-    <div className="flex items-center justify-center min-h-screen bg-gradient-to-b from-gray-50 to-white">
-      <div className="relative">
-        {/* Spinner */}
-        <div className="w-16 h-16 border-4 border-blue-200 border-t-blue-500 rounded-full animate-spin" />
-        
-        {/* Glow effect */}
-        <div className="absolute inset-0 bg-blue-400/30 rounded-full blur-xl animate-pulse" />
-      </div>
+    <div className={`flex items-center justify-center ${className}`}>
+      <div
+        className={`${sizeClasses[size]} border-4 border-gray-200 border-t-[#71bcf0] rounded-full animate-spin`}
+      />
     </div>
   );
 }

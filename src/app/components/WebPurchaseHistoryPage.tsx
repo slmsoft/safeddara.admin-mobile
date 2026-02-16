@@ -1,5 +1,6 @@
-import { ChevronLeft } from 'lucide-react';
+import { ChevronLeft, RefreshCw } from 'lucide-react';
 import { useState } from 'react';
+import { LoadingSpinner } from './LoadingSpinner';
 
 export interface Order {
   id: string;
@@ -24,15 +25,26 @@ interface WebPurchaseHistoryPageProps {
   orders?: Order[];
   onPayOrder?: (orderId: string) => void;
   onCancelOrder?: (orderId: string) => void;
+  onRefresh?: () => void;
+  isLoading?: boolean;
 }
 
-export function WebPurchaseHistoryPage({ onBack, orders = [], onPayOrder, onCancelOrder }: WebPurchaseHistoryPageProps) {
-  const [activeTab, setActiveTab] = useState<'active' | 'history'>('active');
+export function WebPurchaseHistoryPage({ onBack, orders = [], onPayOrder, onCancelOrder, onRefresh, isLoading = false }: WebPurchaseHistoryPageProps) {
+  const [activeTab, setActiveTab] = useState<'active' | 'history'>('history');
 
   const activeOrders = orders.filter(order => order.status === 'pending');
   const historyOrders = orders.filter(order => order.status === 'paid' || order.status === 'cancelled');
 
   const displayedOrders = activeTab === 'active' ? activeOrders : historyOrders;
+
+  // Show loading state
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <LoadingSpinner size="lg" />
+      </div>
+    );
+  }
 
   const getStatusText = (status: Order['status']) => {
     switch (status) {
@@ -67,13 +79,25 @@ export function WebPurchaseHistoryPage({ onBack, orders = [], onPayOrder, onCanc
         <div className="max-w-[1400px] mx-auto px-8 py-5">
           <div className="flex items-center gap-4 mb-6">
             <button
-              onClick={() => onBack && onBack()}
-              className="transition-all active:scale-95"
+              onClick={() => onBack?.()}
+              className="relative z-10 flex items-center justify-center min-w-[44px] min-h-[44px] -m-2 transition-all active:scale-95 rounded-lg hover:bg-gray-100"
               type="button"
+              aria-label="Назад"
             >
               <ChevronLeft className="w-6 h-6 text-gray-700" strokeWidth={2.5} />
             </button>
             <h1 className="text-2xl font-bold text-gray-900">История покупок</h1>
+            {onRefresh && (
+              <button
+                onClick={() => onRefresh()}
+                disabled={isLoading}
+                className="ml-auto p-2 rounded-lg hover:bg-gray-100 transition-colors disabled:opacity-50"
+                type="button"
+                aria-label="Обновить"
+              >
+                <RefreshCw className={`w-5 h-5 text-[#71bcf0] ${isLoading ? 'animate-spin' : ''}`} strokeWidth={2} />
+              </button>
+            )}
           </div>
 
           {/* Tabs */}
@@ -176,15 +200,12 @@ export function WebPurchaseHistoryPage({ onBack, orders = [], onPayOrder, onCanc
                       </span>
                     </div>
 
-                    {/* Action Buttons */}
+                    {/* Action Buttons — по Swagger: оплата только при создании заказа */}
                     {order.status === 'pending' ? (
                       <div className="space-y-1.5">
-                        <button
-                          onClick={() => onPayOrder?.(order.id)}
-                          className="w-full bg-gradient-to-r from-green-500 to-green-600 text-white font-bold py-2 rounded-xl hover:from-green-600 hover:to-green-700 transition-all shadow-md text-xs"
-                        >
-                          Оплатить
-                        </button>
+                        <span className="w-full block py-2 rounded-xl bg-amber-50 text-amber-800 text-center text-xs font-semibold">
+                          Ожидание оплаты
+                        </span>
                         <button
                           onClick={() => onCancelOrder?.(order.id)}
                           className="w-full border border-gray-200 text-gray-600 font-semibold py-2 rounded-xl hover:bg-gray-50 transition-colors text-xs"

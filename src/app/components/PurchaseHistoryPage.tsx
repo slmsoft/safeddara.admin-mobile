@@ -1,5 +1,6 @@
-import { ChevronLeft } from 'lucide-react';
+import { ChevronLeft, RefreshCw } from 'lucide-react';
 import { useState } from 'react';
+import { LoadingSpinner } from './LoadingSpinner';
 
 export interface Order {
   id: string;
@@ -24,15 +25,26 @@ interface PurchaseHistoryPageProps {
   orders?: Order[];
   onPayOrder?: (orderId: string) => void;
   onCancelOrder?: (orderId: string) => void;
+  onRefresh?: () => void;
+  isLoading?: boolean;
 }
 
-export function PurchaseHistoryPage({ onBack, orders = [], onPayOrder, onCancelOrder }: PurchaseHistoryPageProps) {
-  const [activeTab, setActiveTab] = useState<'active' | 'history'>('active');
+export function PurchaseHistoryPage({ onBack, orders = [], onPayOrder, onCancelOrder, onRefresh, isLoading = false }: PurchaseHistoryPageProps) {
+  const [activeTab, setActiveTab] = useState<'active' | 'history'>('history');
 
   const activeOrders = orders.filter(order => order.status === 'pending');
   const historyOrders = orders.filter(order => order.status === 'paid' || order.status === 'cancelled');
 
   const displayedOrders = activeTab === 'active' ? activeOrders : historyOrders;
+
+  // Show loading state
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-[#f0f4f8] flex items-center justify-center">
+        <LoadingSpinner size="lg" />
+      </div>
+    );
+  }
 
   const getStatusText = (status: Order['status']) => {
     switch (status) {
@@ -65,16 +77,29 @@ export function PurchaseHistoryPage({ onBack, orders = [], onPayOrder, onCancelO
       {/* Header */}
       <div className="bg-white sticky top-0 z-10 border-b border-gray-100">
         <div className="px-5 py-4">
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-4 relative">
             <button
-              onClick={() => onBack && onBack()}
-              className="transition-all active:scale-95"
+              onClick={() => onBack?.()}
+              className="relative z-10 flex items-center justify-center min-w-[44px] min-h-[44px] -m-2 transition-all active:scale-95"
               type="button"
+              aria-label="Назад"
             >
               <ChevronLeft className="w-6 h-6 text-[#71bcf0]" strokeWidth={2.5} />
             </button>
-            <h1 className="flex-1 text-center text-base font-semibold text-gray-900 -ml-9">История покупок</h1>
-            <div className="w-6" />
+            <h1 className="flex-1 text-center text-base font-semibold text-gray-900 -ml-9 pointer-events-none">История покупок</h1>
+            {onRefresh ? (
+              <button
+                onClick={() => onRefresh()}
+                disabled={isLoading}
+                className="flex-shrink-0 p-2 -m-2 rounded-lg hover:bg-gray-100 transition-colors disabled:opacity-50"
+                type="button"
+                aria-label="Обновить"
+              >
+                <RefreshCw className={`w-5 h-5 text-[#71bcf0] ${isLoading ? 'animate-spin' : ''}`} strokeWidth={2} />
+              </button>
+            ) : (
+              <div className="w-6 flex-shrink-0" />
+            )}
           </div>
         </div>
 
@@ -165,15 +190,12 @@ export function PurchaseHistoryPage({ onBack, orders = [], onPayOrder, onCancelO
                   ))}
                 </div>
 
-                {/* Action Buttons */}
+                {/* Action Buttons — по Swagger: оплата только при создании заказа */}
                 {order.status === 'pending' && (
                   <div className="flex gap-2 pt-2">
-                    <button
-                      onClick={() => onPayOrder?.(order.id)}
-                      className="flex-1 bg-gradient-to-r from-green-500 to-green-600 text-white font-medium py-3 rounded-xl hover:from-green-600 hover:to-green-700 transition-all shadow-md text-sm"
-                    >
-                      Оплатить
-                    </button>
+                    <span className="flex-1 py-3 rounded-xl bg-amber-50 text-amber-800 text-center text-sm font-medium">
+                      Ожидание оплаты
+                    </span>
                     <button
                       onClick={() => onCancelOrder?.(order.id)}
                       className="flex-1 border border-gray-200 text-gray-600 font-medium py-3 rounded-xl hover:bg-gray-50 transition-colors text-sm"

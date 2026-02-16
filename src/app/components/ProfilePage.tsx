@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { User, Clock, Heart, Info, FileCheck, ChevronRight, Ticket, CreditCard, LogOut } from 'lucide-react';
 import { ModernHeader } from './ModernHeader';
 
@@ -43,6 +43,18 @@ export function ProfilePage({
   onLogout
 }: ProfilePageProps) {
   const [activeMenuItem, setActiveMenuItem] = useState('profile');
+  const [userName, setUserName] = useState('');
+  const [userEmail, setUserEmail] = useState('');
+
+  useEffect(() => {
+    try {
+      setUserName(localStorage.getItem('userName') || '');
+      setUserEmail(localStorage.getItem('userEmail') || '');
+    } catch {
+      setUserName('');
+      setUserEmail('');
+    }
+  }, []);
 
   const menuItems: MenuItem[] = [
     { id: 'profile', label: 'Профиль', icon: User, isActive: true },
@@ -87,13 +99,19 @@ export function ProfilePage({
                     background: 'linear-gradient(90deg, #8EA3FE 29.81%, #71BCF0 70.19%)'
                   }}
                 >
-                  <span className="text-3xl font-bold text-white">CW</span>
+                  <span className="text-3xl font-bold text-white">
+                    {userName ? userName.split(/\s+/).map(n => n[0]).join('').slice(0, 2).toUpperCase() || '?' : '?'}
+                  </span>
                 </div>
                 
-                {/* User Details */}
-                <div className="flex-1">
-                  <h2 className="text-xl font-bold text-gray-900 mb-1">Contact World Contact World</h2>
-                  <p className="text-sm text-gray-500">worldcontact68@gmail.com</p>
+                {/* User Details — из localStorage (регистрация) */}
+                <div className="flex-1 min-w-0">
+                  <h2 className="text-xl font-bold text-gray-900 mb-1 truncate">
+                    {userName || 'Пользователь'}
+                  </h2>
+                  <p className="text-sm text-gray-500 truncate">
+                    {userEmail || '—'}
+                  </p>
                 </div>
               </div>
             </div>

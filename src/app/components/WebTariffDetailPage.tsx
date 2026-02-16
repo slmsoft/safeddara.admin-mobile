@@ -18,6 +18,8 @@ interface WebTariffDetailPageProps {
     priceChild?: number;
     time: string;
     image: string;
+    productId?: number; // Real productId from API
+    categoryId?: number; // Real categoryId from API
   };
   onBack: () => void;
   onAddToCart: (items: TariffOption[], date: string) => void;

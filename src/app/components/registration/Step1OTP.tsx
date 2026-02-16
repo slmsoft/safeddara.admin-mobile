@@ -2,6 +2,8 @@ import { useState, useEffect, useRef } from 'react';
 import { ChevronLeft } from 'lucide-react';
 import { SnowflakesBackground } from './SnowflakesBackground';
 import { SafeddaraLogo } from './SafeddaraLogo';
+import { usersApi } from '../../../api/users';
+import { getDeviceToken } from '../../../api/auth';
 
 interface Step1OTPProps {
   phoneNumber: string;
@@ -12,7 +14,37 @@ interface Step1OTPProps {
 export function Step1OTP({ phoneNumber, onVerify, onBack }: Step1OTPProps) {
   const [otp, setOtp] = useState(['', '', '', '']);
   const [timer, setTimer] = useState(60);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [isSendingCode, setIsSendingCode] = useState(false);
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
+
+  // Extract calling code and phone number
+  const callingCode = phoneNumber.startsWith('+992') ? '+992' : '+992';
+  const phoneNumberOnly = phoneNumber.replace(/^\+992/, '');
+
+  // Send SMS code on mount
+  useEffect(() => {
+    const sendCode = async () => {
+      setIsSendingCode(true);
+      setError(null);
+      try {
+        const deviceToken = getDeviceToken();
+        const response = await usersApi.sendSMSCode({
+          callingCode: '+992',
+          deviceToken,
+          phoneNumber: phoneNumberOnly,
+        });
+      } catch (err: any) {
+        const errorMessage = err.message || (err.success === false ? err.message : 'Ошибка при отправке SMS кода');
+        setError(errorMessage);
+      } finally {
+        setIsSendingCode(false);
+      }
+    };
+
+    sendCode();
+  }, [phoneNumberOnly]);
 
   useEffect(() => {
     if (timer > 0) {
@@ -47,16 +79,54 @@ export function Step1OTP({ phoneNumber, onVerify, onBack }: Step1OTPProps) {
     }
   };
 
-  const handleSubmit = (code: string) => {
-    if (code.length === 4) {
-      onVerify(code);
+  const handleSubmit = async (code: string) => {
+    if (code.length !== 4) return;
+
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const deviceToken = getDeviceToken();
+      const response = await usersApi.verifySMSCode({
+        callingCode: '+992', // API expects format with plus sign according to validate.go
+        deviceToken,
+        phoneNumber: phoneNumberOnly,
+        smsCode: code,
+      });
+
+      if (response.success) {
+        onVerify(code);
+      } else {
+        setError(response.message || 'Неверный код подтверждения');
+      }
+    } catch (err: any) {
+      setError(err.message || 'Ошибка при проверке кода');
+      console.error('Error verifying SMS code:', err);
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const handleResend = () => {
+  const handleResend = async () => {
     setOtp(['', '', '', '']);
     setTimer(60);
-    inputRefs.current[0]?.focus();
+    setError(null);
+    setIsSendingCode(true);
+
+    try {
+      const deviceToken = getDeviceToken();
+      await usersApi.sendSMSCode({
+        callingCode: '+992', // API expects format with plus sign according to validate.go
+        deviceToken,
+        phoneNumber: phoneNumberOnly,
+      });
+    } catch (err: any) {
+      setError(err.message || 'Ошибка при повторной отправке кода');
+      console.error('Error resending SMS code:', err);
+    } finally {
+      setIsSendingCode(false);
+      inputRefs.current[0]?.focus();
+    }
   };
 
   const formatTimer = (seconds: number) => {
@@ -106,6 +176,20 @@ export function Step1OTP({ phoneNumber, onVerify, onBack }: Step1OTPProps) {
               {phoneNumber}
             </p>
 
+            {/* Error Message */}
+            {error && (
+              <div className="mb-4 p-3 bg-red-500/20 border border-red-500/30 rounded-lg">
+                <p className="text-white text-xs text-center">{error}</p>
+              </div>
+            )}
+
+            {/* Loading/Sending Status */}
+            {isSendingCode && (
+              <div className="mb-4">
+                <p className="text-white/60 text-xs text-center">Отправка кода...</p>
+              </div>
+            )}
+
             {/* OTP Form */}
             <div>
               <p className="text-center text-white text-xs font-medium mb-4">
@@ -149,10 +233,10 @@ export function Step1OTP({ phoneNumber, onVerify, onBack }: Step1OTPProps) {
               {/* Submit Button */}
               <button
                 onClick={() => handleSubmit(otp.join(''))}
-                disabled={otp.some(digit => digit === '')}
+                disabled={otp.some(digit => digit === '') || isLoading || isSendingCode}
                 className="w-full bg-white/85 hover:bg-white/95 text-[#6B7CF5] font-bold text-[15px] py-3.5 rounded-[20px] transition-all duration-300 disabled:opacity-35 disabled:cursor-not-allowed disabled:hover:bg-white/85"
               >
-                Подтвердить
+                {isLoading ? 'Проверка...' : 'Подтвердить'}
               </button>
             </div>
           </div>

@@ -5,9 +5,10 @@ import { SafeddaraLogo } from './SafeddaraLogo';
 
 interface Step2Props {
   onNext: (email: string, password: string) => void;
+  onBack?: () => void;
 }
 
-export function Step2({ onNext }: Step2Props) {
+export function Step2({ onNext, onBack }: Step2Props) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -36,12 +37,14 @@ export function Step2({ onNext }: Step2Props) {
           {/* Card with glass effect */}
           <div className="bg-white/15 backdrop-blur-xl rounded-[32px] px-7 pt-10 pb-12 shadow-2xl relative">
             {/* Back Button */}
-            <button
-              onClick={() => window.history.back()}
-              className="absolute left-6 top-6 w-10 h-10 rounded-xl bg-white/15 backdrop-blur-sm flex items-center justify-center text-white hover:bg-white/25 transition-all"
-            >
-              <ChevronLeft className="w-5 h-5" strokeWidth={2.5} />
-            </button>
+            {onBack && (
+              <button
+                onClick={onBack}
+                className="absolute left-6 top-6 w-10 h-10 rounded-xl bg-white/15 backdrop-blur-sm flex items-center justify-center text-white hover:bg-white/25 transition-all"
+              >
+                <ChevronLeft className="w-5 h-5" strokeWidth={2.5} />
+              </button>
+            )}
 
             {/* Logo */}
             <div className="flex justify-center mb-6 mt-6">

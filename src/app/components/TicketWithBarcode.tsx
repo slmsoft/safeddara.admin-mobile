@@ -1,7 +1,7 @@
+import { useState, useEffect, useRef } from 'react';
 import { ChevronLeft } from 'lucide-react';
-import Barcode from 'react-barcode';
 import Logo2 from '@/imports/Logo2';
-import { useState } from 'react';
+import { ordersApi } from '../../api/orders';
 
 interface TicketWithBarcodeProps {
   orderId: string;
@@ -19,21 +19,59 @@ interface TicketWithBarcodeProps {
 }
 
 export function TicketWithBarcode({
+  orderId,
   orderNumber,
   items,
   total,
   createdAt,
-  onClose
+  onClose,
 }: TicketWithBarcodeProps) {
-  // Генерируем уникальный код для штрих-кода
-  const barcodeValue = `SFD${orderNumber}`;
-  
-  // Состояние для увеличения штрих-кода
+  const [barcodeUrl, setBarcodeUrl] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [isBarcodeEnlarged, setIsBarcodeEnlarged] = useState(false);
+
+  // Swagger: GET /orders/{id}/barcode — Returns image/png
+  const blobUrlRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const fetchBarcode = async () => {
+      if (!orderId) {
+        setError('Нет ID заказа');
+        setIsLoading(false);
+        return;
+      }
+      try {
+        setIsLoading(true);
+        setError(null);
+        const response = await ordersApi.getBarcode(orderId);
+        const blob = await response.blob();
+        const url = URL.createObjectURL(blob);
+        blobUrlRef.current = url;
+        if (!cancelled) setBarcodeUrl(url);
+        else URL.revokeObjectURL(url);
+      } catch (err: any) {
+        if (!cancelled) setError(err?.message || 'Не удалось загрузить штрихкод');
+      } finally {
+        if (!cancelled) setIsLoading(false);
+      }
+    };
+
+    fetchBarcode();
+
+    return () => {
+      cancelled = true;
+      if (blobUrlRef.current) {
+        URL.revokeObjectURL(blobUrlRef.current);
+        blobUrlRef.current = null;
+      }
+    };
+  }, [orderId]);
 
   return (
     <div className="fixed inset-0 bg-white z-50 flex flex-col">
-      
       {/* Header with Back Button */}
       <div className="px-6 py-4 border-b border-gray-100">
         <button
@@ -47,23 +85,20 @@ export function TicketWithBarcode({
       {/* Ticket Container */}
       <div className="flex-1 flex items-start justify-center p-6 overflow-auto relative">
         <div className={`w-full max-w-sm transition-opacity duration-300 ${isBarcodeEnlarged ? 'opacity-30' : 'opacity-100'}`}>
-          
           {/* Ticket Card */}
           <div className="bg-white">
-            
             {/* Logo/Brand */}
             <div className="text-center pt-6 pb-4">
               <div className="inline-block flex flex-col items-center">
                 <div className="w-24 h-24">
                   <Logo2 />
                 </div>
-                <p className="text-xs text-gray-500 mt-2">Таджкистан</p>
+                <p className="text-xs text-gray-500 mt-2">Таджикистан</p>
               </div>
             </div>
 
             {/* Main Info Grid */}
             <div className="px-6 pb-6 space-y-5">
-              
               {/* Date and Ticket Number */}
               <div className="flex items-start justify-between">
                 <div>
@@ -102,43 +137,44 @@ export function TicketWithBarcode({
               </div>
             </div>
 
-            {/* Barcode Section - ВНИЗУ */}
+            {/* Barcode Section — Swagger: GET /orders/{id}/barcode (image/png) */}
             <div className="px-6 pb-8 pt-4">
-              <div 
-                className="flex justify-center cursor-pointer"
-                onClick={() => setIsBarcodeEnlarged(true)}
+              <div
+                className="flex justify-center cursor-pointer min-h-[80px] items-center"
+                onClick={() => barcodeUrl && setIsBarcodeEnlarged(true)}
               >
-                <Barcode
-                  value={barcodeValue}
-                  width={2}
-                  height={60}
-                  displayValue={true}
-                  fontSize={12}
-                  background="#ffffff"
-                  lineColor="#000000"
-                  margin={0}
-                />
+                {isLoading && (
+                  <div className="py-8 text-gray-400 text-sm">Загрузка штрихкода...</div>
+                )}
+                {error && (
+                  <div className="py-8 text-red-500 text-sm text-center">{error}</div>
+                )}
+                {barcodeUrl && !isLoading && (
+                  <img
+                    src={barcodeUrl}
+                    alt="Штрихкод билета"
+                    className="max-w-full h-auto max-h-[80px] object-contain"
+                  />
+                )}
               </div>
             </div>
           </div>
         </div>
 
         {/* Enlarged Barcode Overlay */}
-        {isBarcodeEnlarged && (
-          <div 
+        {isBarcodeEnlarged && barcodeUrl && (
+          <div
             className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center backdrop-blur-sm"
             onClick={() => setIsBarcodeEnlarged(false)}
           >
-            <div className="bg-white rounded-2xl p-8 shadow-2xl animate-in zoom-in-95 duration-300">
-              <Barcode
-                value={barcodeValue}
-                width={3}
-                height={120}
-                displayValue={true}
-                fontSize={16}
-                background="#ffffff"
-                lineColor="#000000"
-                margin={10}
+            <div
+              className="bg-white rounded-2xl p-8 shadow-2xl animate-in zoom-in-95 duration-300"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <img
+                src={barcodeUrl}
+                alt="Штрихкод билета"
+                className="max-w-full max-h-[300px] object-contain"
               />
             </div>
           </div>

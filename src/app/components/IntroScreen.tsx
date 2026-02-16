@@ -1,42 +1,25 @@
-import { useState, useEffect, useRef } from 'react';
-import safeddaraVideo from '../../assets/safeddara.mp4';
+import { useEffect } from 'react';
 
 interface IntroScreenProps {
   onComplete: () => void;
 }
 
 export function IntroScreen({ onComplete }: IntroScreenProps) {
-  const videoRef = useRef<HTMLVideoElement>(null);
-
   useEffect(() => {
-    const video = videoRef.current;
-    if (video) {
-      video.play().catch((error) => {
-        console.error('Error playing video:', error);
-      });
-    }
-  }, []);
-
-  const handleVideoEnd = () => {
-    // Переход к регистрации через небольшую задержку
-    setTimeout(() => {
+    // Автоматически переходим к регистрации через небольшую задержку
+    const timer = setTimeout(() => {
       onComplete();
-    }, 500);
-  };
+    }, 2000); // 2 секунды показа интро экрана
+
+    return () => clearTimeout(timer);
+  }, [onComplete]);
 
   return (
-    <div className="fixed inset-0 z-[10000] bg-black flex items-center justify-center">
-      <video
-        ref={videoRef}
-        className="w-full h-full object-cover"
-        autoPlay
-        muted
-        playsInline
-        onEnded={handleVideoEnd}
-      >
-        <source src={safeddaraVideo} type="video/mp4" />
-        Ваш браузер не поддерживает видео.
-      </video>
+    <div className="fixed inset-0 z-[10000] bg-gradient-to-br from-blue-600 via-blue-800 to-indigo-900 flex items-center justify-center">
+      <div className="text-center text-white">
+        <h1 className="text-4xl lg:text-6xl font-bold mb-4">Safeddara</h1>
+        <p className="text-lg lg:text-xl opacity-90">Горнолыжный курорт</p>
+      </div>
     </div>
   );
 }

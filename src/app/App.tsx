@@ -2,7 +2,9 @@ import { useState, useEffect } from 'react';
 import { DesktopCategoryBar } from './components/DesktopCategoryBar';
 import { LanguageProvider } from './contexts/LanguageContext';
 import { ScrollPositionProvider } from './contexts/ScrollPositionContext';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { AdminApp } from './components/admin/AdminApp';
+import type { Order as ApiOrder, OrderProduct } from '../api/types';
 import { HotelBookingPage, BookingData } from './components/HotelBookingPage';
 import { HotelBookingConfirmPage } from './components/HotelBookingConfirmPage';
 import { WebHotelBookingConfirmPage } from './components/WebHotelBookingConfirmPage';
@@ -12,9 +14,6 @@ import { WorkingHoursPage } from './components/WorkingHoursPage';
 import { PurchaseHistoryPage, Order } from './components/PurchaseHistoryPage';
 import { WebPurchaseHistoryPage } from './components/WebPurchaseHistoryPage';
 import { PaymentMethodModal } from './components/PaymentMethodModal';
-import { MilliCardPaymentModal } from './components/MilliCardPaymentModal';
-import { WebMilliCardPaymentModal } from './components/WebMilliCardPaymentModal';
-import { AktivbonkPaymentModal } from './components/AktivbonkPaymentModal';
 import { MyTicketsPage } from './components/MyTicketsPage';
 import { TicketWithBarcode } from './components/TicketWithBarcode';
 import { ModernHeader } from './components/ModernHeader';
@@ -49,12 +48,13 @@ import { WebFavoritesPage } from './components/WebFavoritesPage';
 import { InsurancePage } from './components/InsurancePage';
 import { AboutPage } from './components/AboutPage';
 import { AddressPage } from './components/AddressPage';
+import { PaymentWebViewPage } from './components/PaymentWebViewPage';
 import { EntertainmentPage } from './components/EntertainmentPage';
 import { ComingSoonPage } from './components/ComingSoonPage';
 import { WebHeader } from './components/WebHeader';
 import { WebFooter } from './components/WebFooter';
-import { IntroScreen } from './components/IntroScreen';
 import { RegistrationFlow } from './components/RegistrationFlow';
+import { LoginPage } from './components/LoginPage';
 
 type NavPage = 'home' | 'menu' | 'tariffs' | 'cart' | 'profile';
 
@@ -67,6 +67,8 @@ interface CartItem {
   price: number;
   quantity: number;
   image: string;
+  productId: number; // Real productId from API
+  categoryId: number; // Real categoryId from API
 }
 
 interface SavedCard {
@@ -77,13 +79,87 @@ interface SavedCard {
 }
 
 function AppContent() {
-  // Check if intro and registration are completed
-  const [showIntro, setShowIntro] = useState(() => {
-    return !localStorage.getItem('introShown');
-  });
+  const { isAuthenticated } = useAuth();
+  
+  // Check if registration is completed (intro removed - show registration directly)
   const [showRegistration, setShowRegistration] = useState(() => {
-    return !localStorage.getItem('isRegistered');
+    // Show registration if not registered AND not authenticated
+    // Use localStorage check directly to avoid hook dependency in initializer
+    try {
+      const isRegistered = localStorage.getItem('isRegistered');
+      const hasSession = localStorage.getItem('safeddara_session');
+      return !isRegistered && !hasSession;
+    } catch {
+      return true; // Show registration if localStorage is not available
+    }
   });
+  
+  // Login page state
+  const [showLogin, setShowLogin] = useState(false);
+  
+  // Update registration state when auth changes
+  useEffect(() => {
+    if (isAuthenticated) {
+      setShowRegistration(false);
+    } else {
+      // Re-check registration state if auth changes
+      const isRegistered = localStorage.getItem('isRegistered');
+      const hasSession = localStorage.getItem('safeddara_session');
+      setShowRegistration(!isRegistered && !hasSession);
+    }
+  }, [isAuthenticated]);
+
+  // Load payments from API — GET /payments/all (Swagger)
+  const [paymentsLoading, setPaymentsLoading] = useState(false);
+  
+  const loadPayments = async () => {
+    if (!isAuthenticated) return;
+    setPaymentsLoading(true);
+    try {
+      const { paymentsApi } = await import('../api/payments');
+      const response = await paymentsApi.getAllPayments();
+      if (response.success && response.data && typeof response.data === 'object') {
+        const userPayments = (response.data as any).userPayments;
+        if (Array.isArray(userPayments)) {
+          const mappedOrders: Order[] = userPayments.map((payment: any) => {
+            const total = payment.totalPrice ?? payment.totalAmount ?? payment.amount ?? payment.total ?? 0;
+            const orderType = payment.orderType || 'Услуга';
+            const items = payment.items && Array.isArray(payment.items) && payment.items.length > 0
+              ? payment.items.map((item: any) => ({
+                  id: String(item.productId ?? item.id ?? ''),
+                  name: item.name || item.title || 'Товар',
+                  categoryName: item.categoryName || payment.categoryName || orderType,
+                  price: item.price ?? total,
+                  quantity: item.quantity ?? 1,
+                  date: payment.date ? new Date(payment.date).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '',
+                  image: item.image || '',
+                  description: item.description || '',
+                }))
+              : [{ id: '1', name: orderType, categoryName: orderType, price: total, quantity: 1, date: '', image: '', description: '' }];
+            const statusMap: Record<string, Order['status']> = {
+              payment_paid: 'paid', payment_failed: 'cancelled', payment_pending: 'pending',
+              paid: 'paid', cancelled: 'cancelled',
+            };
+            return {
+              id: payment.orderId || payment.id || `order-${Date.now()}`,
+              orderNumber: String(payment.orderId ?? payment.id ?? ''),
+              items,
+              total: Number(total),
+              status: statusMap[payment.status] ?? 'pending',
+              createdAt: payment.date ? new Date(payment.date).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : new Date().toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
+            };
+          });
+          setOrders(mappedOrders);
+        }
+      }
+    } catch (err: any) {
+      console.error('Error loading payments:', err);
+    } finally {
+      setPaymentsLoading(false);
+    }
+  };
+
+  // Не загружаем платежи при старте — только при открытии «История покупок» или после оплаты
   
   const [currentPage, setCurrentPage] = useState<NavPage>('home');
   const [showWeather, setShowWeather] = useState(false);
@@ -106,6 +182,13 @@ function AppContent() {
   const [showMyBookings, setShowMyBookings] = useState(false);
   const [showPurchaseHistory, setShowPurchaseHistory] = useState(false);
   const [showPaymentMethods, setShowPaymentMethods] = useState(false);
+
+  // Загружаем платежи только при открытии «История покупок» или «Мои билеты» — не при старте приложения
+  useEffect(() => {
+    if ((showPurchaseHistory || showMyTickets) && isAuthenticated) {
+      loadPayments();
+    }
+  }, [showPurchaseHistory, showMyTickets]);
   const [showAddCard, setShowAddCard] = useState(false);
   const [showFeedback, setShowFeedback] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
@@ -122,8 +205,9 @@ function AppContent() {
   const [showBookingDetails, setShowBookingDetails] = useState(false);
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
   const [showPaymentMethodModal, setShowPaymentMethodModal] = useState(false);
-  const [showMilliCardModal, setShowMilliCardModal] = useState(false);
-  const [showAktivbonkModal, setShowAktivbonkModal] = useState(false);
+  const [paymentUrl, setPaymentUrl] = useState<string | null>(null);
+  const [showPaymentWebView, setShowPaymentWebView] = useState(false);
+  const [paymentUrlLoading, setPaymentUrlLoading] = useState(false);
   const [comingSoonSource, setComingSoonSource] = useState<NavPage>('home');
   const [openMapDirectly, setOpenMapDirectly] = useState(false);
   
@@ -180,8 +264,6 @@ function AppContent() {
     setShowHotelBooking(false);
     setShowHotelBookingConfirm(false);
     setShowPaymentMethodModal(false);
-    setShowMilliCardModal(false);
-    setShowAktivbonkModal(false);
     setShowKids(false);
     setShowSchool(false);
     setShowEntertainment(false);
@@ -191,17 +273,15 @@ function AppContent() {
     setPendingHotelBooking(null);
   };
   
-  // Handle logout - clear registration and return to intro
+  // Handle logout - clear registration and return to registration
   const handleLogout = () => {
     // Clear all registration data
-    localStorage.removeItem('introShown');
     localStorage.removeItem('isRegistered');
     localStorage.removeItem('userName');
     localStorage.removeItem('userPhone');
     localStorage.removeItem('userEmail');
     
-    // Reset states to show intro and registration
-    setShowIntro(true);
+    // Reset state to show registration
     setShowRegistration(true);
     
     // Close all modals and reset to home
@@ -238,6 +318,7 @@ function AppContent() {
   };
 
   // Add to cart function - накапливает товары из разных разделов
+  // Now uses real productId and categoryId from API
   const handleAddToCart = (categoryName: string, tariff: any, options: any[], date: string) => {
     // Очищаем старые товары этого тарифа перед добавлением новых
     const filteredCart = cartItems.filter(item => 
@@ -245,17 +326,20 @@ function AppContent() {
     );
     
     // Создаем новые товары только для опций с quantity > 0
+    // tariff now contains productId and categoryId from API
     const newItems: CartItem[] = options
       .filter(option => option.quantity > 0)
       .map((option) => ({
-        id: `${tariff.id}-${option.id}-${Date.now()}`,
+        id: `${tariff.productId || tariff.id}-${option.id}-${Date.now()}`,
         category: categoryName,
         name: option.name,
         description: `${tariff.name}`,
         date: date,
         price: option.price,
         quantity: option.quantity,
-        image: tariff.image || 'https://images.unsplash.com/photo-1551524559-8af4e6624178?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=400'
+        image: tariff.image || 'https://images.unsplash.com/photo-1551524559-8af4e6624178?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=400',
+        productId: tariff.productId || 0, // Real productId from API
+        categoryId: tariff.categoryId || 0, // Real categoryId from API
       }));
     
     // Обновляем корзину
@@ -298,203 +382,193 @@ function AppContent() {
     return 'Card';
   };
 
+  // Load saved cards from API when opening payment
+  // Swagger: userCards: [{ cardId, cardMasked, exp, cardBrand }]
+  const loadSavedCardsFromApi = async () => {
+    try {
+      const { cardsApi } = await import('../api/cards');
+      const response = await cardsApi.getAllCards();
+      if (response.success && response.data && typeof response.data === 'object') {
+        const userCards = (response.data as any).userCards;
+        if (Array.isArray(userCards) && userCards.length > 0) {
+          const cards: SavedCard[] = userCards.map((uc: any) => {
+            const cardId = uc.cardId ?? uc.id ?? 0;
+            // Поддержка разных форматов API: cardMasked, pun, card_number, masked
+            const masked = (uc.cardMasked ?? uc.pun ?? uc.card_number ?? uc.masked ?? '').toString();
+            // Извлекаем последние 4 цифры из любой маски (****1234, 5058****0662 и т.д.)
+            const digits = masked.replace(/\D/g, '');
+            const last4 = digits.length >= 4 ? digits.slice(-4) : (masked.length >= 4 ? masked.slice(-4) : '');
+            const exp = (uc.exp ?? uc.expiry ?? (uc.expMonth != null && uc.expYear != null ? `${uc.expMonth}/${uc.expYear}` : '')).toString();
+            return {
+              id: `card-${cardId}`,
+              cardNumber: last4 ? `****${last4}` : masked || '••••',
+              expiry: exp,
+              cardType: uc.cardBrand ?? uc.cardType ?? 'Card',
+            };
+          });
+          setSavedCards(cards);
+        }
+      }
+    } catch (err) {
+      console.error('Error loading cards:', err);
+    }
+  };
+
   // Checkout - open payment modal
-  const handleCheckout = () => {
+  const handleCheckout = async () => {
     console.log('=== handleCheckout called ===');
     console.log('cartItems.length:', cartItems.length);
-    console.log('cartItems:', cartItems);
     
     if (cartItems.length === 0) return;
     
     setPendingOrderItems(cartItems);
-    console.log('Setting pendingOrderItems:', cartItems);
-    console.log('Opening payment method modal...');
+    await loadSavedCardsFromApi();
     setShowPaymentMethodModal(true);
   };
 
-  // Create order after payment method selection
-  const createOrderAndProceed = (paymentMethod: 'kaspi' | 'card') => {
-    if (pendingOrderItems.length === 0) return;
-    
-    const orderNumber = `${Math.floor(100000 + Math.random() * 900000)}`;
-    const now = new Date();
-    const formattedDate = now.toLocaleDateString('ru-RU');
-    
-    const newOrder: Order = {
-      id: `order-${Date.now()}`,
-      orderNumber,
-      items: pendingOrderItems.map(item => ({
-        id: item.id,
-        name: item.name,
-        categoryName: item.category,
-        price: item.price,
-        quantity: item.quantity,
-        date: item.date,
-        image: item.image,
-        description: item.description
-      })),
-      total: pendingOrderItems.reduce((sum, item) => sum + (item.price * item.quantity), 0),
-      status: 'paid',  // Immediately mark as paid after payment
-      createdAt: formattedDate
-    };
-    
-    setOrders((prev) => [newOrder, ...prev]);
-    setCartItems([]);
-    setPendingOrderItems([]);
-    setShowPaymentMethodModal(false);
-    setCurrentPage('profile');
-    setShowPurchaseHistory(true);
+  // Create order — Swagger: POST /orders/products/create
+  const createOrderAndProceed = async (cardId: number) => {
+    if (pendingOrderItems.length === 0 || !isAuthenticated) return;
+    if (!cardId || cardId === 0) throw new Error('Выберите карту для оплаты');
+
+    try {
+      const { ordersApi } = await import('../api/orders');
+
+      // Parse date from first item (assuming all items have same date)
+      const dateStr = pendingOrderItems[0]?.date || new Date().toISOString().split('T')[0];
+      const [day, month, year] = dateStr.split('.');
+      const startDate = year ? `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}` : dateStr;
+      const endDate = startDate; // Assuming single day orders for now
+
+      // Map cart items to order products using real productId from API
+      const orderProducts: OrderProduct[] = pendingOrderItems.map(item => {
+        // Use real productId from CartItem (now stored when adding to cart)
+        const productId = item.productId || 0;
+        
+        if (productId === 0) {
+          console.warn('[CreateOrder] Cart item missing productId:', item);
+        }
+        
+        return {
+          productId: productId,
+          quantity: item.quantity,
+        };
+      });
+
+      // Use real categoryId from first item (all items in order should have same categoryId)
+      const categoryId = pendingOrderItems[0]?.categoryId || 0;
+      
+      if (categoryId === 0) {
+        console.error('[CreateOrder] No categoryId found in cart items');
+        throw new Error('Не удалось определить категорию заказа');
+      }
+
+      const apiOrder: ApiOrder = {
+        cardId,
+        categoryId,
+        startDate,
+        endDate,
+        products: orderProducts,
+      };
+
+      const response = await ordersApi.createOrder(apiOrder);
+      
+      if (response.success) {
+        setCartItems([]);
+        setPendingOrderItems([]);
+        setShowPaymentMethodModal(false);
+        // По Swagger: после создания заказа API даёт ссылку на оплату (orderURL в GET /payments/all)
+        // Оплата создаётся асинхронно — опрашиваем API до появления orderURL
+        setPaymentUrlLoading(true);
+        const { paymentsApi } = await import('../api/payments');
+        const pollInterval = 2000;
+        const maxAttempts = 20; // ~40 сек
+        let attempts = 0;
+        const pollForPaymentUrl = async (): Promise<string | null> => {
+          const payResponse = await paymentsApi.getAllPayments();
+          if (payResponse.success && payResponse.data && typeof payResponse.data === 'object') {
+            const userPayments = (payResponse.data as any).userPayments;
+            if (Array.isArray(userPayments) && userPayments.length > 0) {
+              const first = userPayments[0];
+              const url = first.orderURL ?? first.orderUrl ?? first.order_url;
+              if (url && typeof url === 'string' && url.startsWith('http')) {
+                return url;
+              }
+            }
+          }
+          return null;
+        };
+        let url: string | null = null;
+        while (attempts < maxAttempts) {
+          url = await pollForPaymentUrl();
+          if (url) break;
+          await new Promise(r => setTimeout(r, pollInterval));
+          attempts++;
+        }
+        setPaymentUrlLoading(false);
+        if (url) {
+          setPaymentUrl(url);
+          setShowPaymentWebView(true);
+        } else {
+          setCurrentPage('profile');
+          setShowPurchaseHistory(true);
+          try {
+            const payResponse = await paymentsApi.getAllPayments();
+            if (payResponse.success && payResponse.data && typeof payResponse.data === 'object') {
+              const userPayments = (payResponse.data as any).userPayments;
+              if (Array.isArray(userPayments)) {
+                const mapped = userPayments.map((p: any) => {
+                  const total = p.totalPrice ?? p.totalAmount ?? 0;
+                  const statusMap: Record<string, Order['status']> = {
+                    payment_paid: 'paid', payment_failed: 'cancelled', payment_pending: 'pending',
+                    paid: 'paid', cancelled: 'cancelled', canceled: 'cancelled',
+                  };
+                  return {
+                    id: p.orderId || p.id || `order-${Date.now()}`,
+                    orderNumber: String(p.orderId ?? p.id ?? ''),
+                    items: [{ id: '1', name: p.orderType || 'Услуга', categoryName: 'Услуга', price: total, quantity: 1, date: p.date ? new Date(p.date).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '', image: '', description: '' }],
+                    total: Number(total),
+                    status: statusMap[p.status] ?? 'pending',
+                    createdAt: p.date ? new Date(p.date).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : new Date().toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
+                  };
+                });
+                setOrders(mapped);
+              }
+            }
+          } catch (e) {
+            console.error('Reload payments:', e);
+          }
+        }
+      } else {
+        alert('Ошибка создания заказа: ' + (response.message || 'Неизвестная ошибка'));
+      }
+    } catch (error: any) {
+      setPaymentUrlLoading(false);
+      console.error('Error creating order:', error);
+      alert('Ошибка создания заказа: ' + (error.message || 'Неизвестная ошибка'));
+    }
   };
 
-  // Handle payment modal close (user cancelled)
+  // Handle payment modal close (user cancelled) — по Swagger: только закрыть, без моков
   const handlePaymentModalClose = () => {
-    if (pendingOrderItems.length === 0) {
-      setShowPaymentMethodModal(false);
-      return;
-    }
-
-    // Create order with pending status
-    const orderNumber = `${Math.floor(100000 + Math.random() * 900000)}`;
-    const now = new Date();
-    const formattedDate = now.toLocaleDateString('ru-RU');
-    
-    const newOrder: Order = {
-      id: `order-${Date.now()}`,
-      orderNumber,
-      items: pendingOrderItems.map(item => ({
-        id: item.id,
-        name: item.name,
-        categoryName: item.category,
-        price: item.price,
-        quantity: item.quantity,
-        date: item.date,
-        image: item.image,
-        description: item.description
-      })),
-      total: pendingOrderItems.reduce((sum, item) => sum + (item.price * item.quantity), 0),
-      status: 'pending',
-      createdAt: formattedDate
-    };
-    
-    setOrders((prev) => [newOrder, ...prev]);
-    setCartItems([]);
     setPendingOrderItems([]);
     setShowPaymentMethodModal(false);
-    setCurrentPage('profile');
-    setShowPurchaseHistory(true);
   };
 
-  // Pay order - open payment modal
-  const handlePayOrder = (orderId: string) => {
-    // Find the order and show payment modal
-    const order = orders.find(o => o.id === orderId);
-    if (order) {
-      // Store the order ID for payment completion
-      setPendingOrderItems(order.items.map(item => ({
-        id: item.id,
-        category: item.categoryName,
-        name: item.name,
-        description: item.description,
-        date: item.date,
-        price: item.price,
-        quantity: item.quantity,
-        image: item.image
-      })));
-      setShowPaymentMethodModal(true);
-      // Store order ID to update later
-      (window as any).pendingPaymentOrderId = orderId;
-    }
-  };
-
-  // Complete payment after method selection
-  const completePayment = (paymentMethod: 'kaspi' | 'card') => {
-    const orderId = (window as any).pendingPaymentOrderId;
-    if (orderId) {
-      setOrders((prev) =>
-        prev.map((order) =>
-          order.id === orderId ? { ...order, status: 'paid' as const } : order
-        )
-      );
-      delete (window as any).pendingPaymentOrderId;
-    }
-    setPendingOrderItems([]);
-    setShowPaymentMethodModal(false);
-    setCurrentPage('profile');
-    setShowPurchaseHistory(true);
-  };
-
-  // Handle payment for existing order or create new order
-  const handlePaymentMethodSelect = (paymentMethod: 'kaspi' | 'card') => {
-    if (paymentMethod === 'kaspi') {
-      // Open Milli card modal
-      setShowPaymentMethodModal(false);
-      setShowMilliCardModal(true);
-    } else {
-      // Open АКТИВБОНК modal
-      setShowPaymentMethodModal(false);
-      setShowAktivbonkModal(true);
-    }
-  };
-
-  // Handle saved card selection
-  const handleSavedCardSelect = (cardId: string) => {
-    setShowPaymentMethodModal(false);
+  // Complete hotel booking (локально, не в Swagger — оплата через API не предусмотрена)
+  const completeHotelBookingPayment = (booking?: BookingData | null) => {
+    const data = booking ?? pendingHotelBooking;
+    if (!data) return;
     
-    if ((window as any).pendingPaymentOrderId) {
-      // Payment for existing order
-      completePayment('kaspi');
-    } else {
-      // New order from cart
-      createOrderAndProceed('kaspi');
-    }
-  };
-
-  // Handle Milli card payment
-  const handleMilliCardPay = (cardNumber: string, cvv: string, expiry: string) => {
-    setShowMilliCardModal(false);
-    
-    if ((window as any).pendingPaymentOrderId) {
-      // Payment for existing order
-      completePayment('kaspi');
-    } else if (pendingHotelBooking) {
-      // Payment for hotel booking
-      completeHotelBookingPayment();
-    } else {
-      // New order from cart
-      createOrderAndProceed('kaspi');
-    }
-  };
-
-  // Handle Aktivbonk payment
-  const handleAktivbonkPay = (cardNumber: string, cvv: string, expiry: string) => {
-    setShowAktivbonkModal(false);
-    
-    if ((window as any).pendingPaymentOrderId) {
-      // Payment for existing order
-      completePayment('card');
-    } else if (pendingHotelBooking) {
-      // Payment for hotel booking
-      completeHotelBookingPayment();
-    } else {
-      // New order from cart
-      createOrderAndProceed('card');
-    }
-  };
-
-  // Complete hotel booking payment
-  const completeHotelBookingPayment = () => {
-    if (!pendingHotelBooking) return;
-    
-    // Create a new booking
     const newBooking: Booking = {
       id: `booking-${Date.now()}`,
-      roomName: pendingHotelBooking.room.name,
-      roomImage: pendingHotelBooking.room.image,
-      checkIn: pendingHotelBooking.checkIn.toISOString().split('T')[0],
-      checkOut: pendingHotelBooking.checkOut.toISOString().split('T')[0],
-      guests: pendingHotelBooking.guests,
-      nights: pendingHotelBooking.nights,
-      totalPrice: pendingHotelBooking.totalPrice,
+      roomName: data.room.name,
+      roomImage: data.room.image,
+      checkIn: data.checkIn.toISOString().split('T')[0],
+      checkOut: data.checkOut.toISOString().split('T')[0],
+      guests: data.guests,
+      nights: data.nights,
+      totalPrice: data.totalPrice,
       status: 'active',
       bookingDate: new Date().toISOString().split('T')[0]
     };
@@ -522,24 +596,33 @@ function AppContent() {
     );
   };
 
-  // Show intro first if not shown yet
-  if (showIntro) {
+  // Show registration if not completed (intro removed)
+  // Show login page if requested
+  if (showLogin) {
     return (
-      <IntroScreen
-        onComplete={() => {
-          localStorage.setItem('introShown', 'true');
-          setShowIntro(false);
+      <LoginPage
+        onBack={() => {
+          setShowLogin(false);
+          setShowRegistration(true);
+        }}
+        onSuccess={() => {
+          setShowLogin(false);
+          setShowRegistration(false);
         }}
       />
     );
   }
 
-  // Show registration if not completed
+  // Show registration flow if not registered
   if (showRegistration) {
     return (
       <RegistrationFlow
         onComplete={() => {
           setShowRegistration(false);
+        }}
+        onSwitchToLogin={() => {
+          setShowRegistration(false);
+          setShowLogin(true);
         }}
       />
     );
@@ -599,74 +682,56 @@ function AppContent() {
 
       {/* Main Content Area */}
       <div>
-        {/* Payment Method Modal */}
+        {/* Loading: ожидание ссылки на оплату от API */}
+        {paymentUrlLoading && (
+          <div className="fixed inset-0 z-50 bg-white/95 flex flex-col items-center justify-center">
+            <div className="animate-spin w-10 h-10 border-2 border-[#71bcf0] border-t-transparent rounded-full" />
+            <p className="mt-4 text-gray-600 font-medium">Ожидание ссылки на оплату...</p>
+          </div>
+        )}
+        {/* Payment WebView — ссылка на оплату из API (orderURL) */}
+        {showPaymentWebView && paymentUrl && (
+          <PaymentWebViewPage
+            paymentUrl={paymentUrl}
+            onWeatherClick={() => setShowWeather(true)}
+            onLiveClick={() => setShowCameras(true)}
+            onBack={async () => {
+              setShowPaymentWebView(false);
+              setPaymentUrl(null);
+              setCurrentPage('profile');
+              setShowPurchaseHistory(true);
+              try {
+                const { paymentsApi } = await import('../api/payments');
+                const payResponse = await paymentsApi.getAllPayments();
+                if (payResponse.success && payResponse.data && typeof payResponse.data === 'object') {
+                  const userPayments = (payResponse.data as any).userPayments;
+                  if (Array.isArray(userPayments)) {
+                    const mapped = userPayments.map((p: any) => ({
+                      id: p.orderId || p.id || `order-${Date.now()}`,
+                      orderNumber: p.orderId || String(p.id || ''),
+                      items: [{ id: '1', name: p.orderType || 'Услуга', categoryName: 'Услуга', price: p.totalPrice ?? p.totalAmount ?? 0, quantity: 1, date: p.date ? new Date(p.date).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '', image: '', description: '' }],
+                      total: p.totalPrice ?? p.totalAmount ?? 0,
+                      status: (p.status === 'payment_paid' || p.status === 'paid') ? 'paid' : p.status === 'canceled' ? 'cancelled' : 'pending',
+                      createdAt: p.date ? new Date(p.date).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : new Date().toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
+                    }));
+                    setOrders(mapped);
+                  }
+                }
+              } catch (e) {
+                console.error('Reload payments:', e);
+              }
+            }}
+          />
+        )}
+
         {showPaymentMethodModal && (
           <PaymentMethodModal
             isOpen={showPaymentMethodModal}
             onClose={handlePaymentModalClose}
-            onSelectKaspi={() => handlePaymentMethodSelect('kaspi')}
-            onSelectCard={() => handlePaymentMethodSelect('card')}
             savedCards={savedCards}
-            onSelectSavedCard={handleSavedCardSelect}
+            onCreateOrder={createOrderAndProceed}
           />
         )}
-
-        {/* Milli Card Payment Modal */}
-        {showMilliCardModal && (() => {
-          const totalAmount = pendingOrderItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-          const itemsCount = pendingOrderItems.reduce((sum, item) => sum + item.quantity, 0);
-          
-          return (
-            <>
-              {/* Mobile Version */}
-              <div className="lg:hidden">
-                <MilliCardPaymentModal
-                  isOpen={showMilliCardModal}
-                  onClose={() => setShowMilliCardModal(false)}
-                  onPay={handleMilliCardPay}
-                  totalAmount={totalAmount}
-                  itemsCount={itemsCount}
-                  productsAmount={totalAmount}
-                  savedCards={savedCards}
-                  onWeatherClick={() => setShowWeather(true)}
-                  onLiveClick={() => setShowCameras(true)}
-                />
-              </div>
-              
-              {/* Desktop Version */}
-              <div className="hidden lg:block">
-                <WebMilliCardPaymentModal
-                  isOpen={showMilliCardModal}
-                  onClose={() => setShowMilliCardModal(false)}
-                  onPay={handleMilliCardPay}
-                  totalAmount={totalAmount}
-                  itemsCount={itemsCount}
-                  productsAmount={totalAmount}
-                  savedCards={savedCards}
-                />
-              </div>
-            </>
-          );
-        })()}
-
-        {/* АКТИВБОНК Payment Modal */}
-        {showAktivbonkModal && (() => {
-          const totalAmount = pendingOrderItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-          const itemsCount = pendingOrderItems.reduce((sum, item) => sum + item.quantity, 0);
-          
-          return (
-            <AktivbonkPaymentModal
-              isOpen={showAktivbonkModal}
-              onClose={() => setShowAktivbonkModal(false)}
-              onPay={handleAktivbonkPay}
-              totalAmount={totalAmount}
-              itemsCount={itemsCount}
-              productsAmount={totalAmount}
-              onWeatherClick={() => setShowWeather(true)}
-              onLiveClick={() => setShowCameras(true)}
-            />
-          );
-        })()}
 
         {/* Weather Overlay */}
         {showWeather ? (
@@ -703,9 +768,7 @@ function AppContent() {
                   setShowHotelBooking(true);
                 }}
                 onConfirmBooking={() => {
-                  // Store booking data and open payment modal
-                  setPendingHotelBooking(currentBooking);
-                  setShowPaymentMethodModal(true);
+                  completeHotelBookingPayment(currentBooking);
                 }}
                 onWeatherClick={() => setShowWeather(true)}
                 onLiveClick={() => setShowCameras(true)}
@@ -722,9 +785,7 @@ function AppContent() {
                   setShowHotelBooking(true);
                 }}
                 onConfirmBooking={() => {
-                  // Store booking data and open payment modal
-                  setPendingHotelBooking(currentBooking);
-                  setShowPaymentMethodModal(true);
+                  completeHotelBookingPayment(currentBooking);
                 }}
                 onWeatherClick={() => setShowWeather(true)}
                 onLiveClick={() => setShowCameras(true)}
@@ -827,11 +888,13 @@ function AppContent() {
             <div className="lg:hidden">
               <PurchaseHistoryPage
                 orders={orders}
+                isLoading={paymentsLoading}
+                onRefresh={loadPayments}
                 onBack={() => {
                   setShowPurchaseHistory(false);
                   setCurrentPage('profile');
                 }}
-                onPayOrder={handlePayOrder}
+                onPayOrder={undefined}
                 onCancelOrder={handleCancelOrder}
               />
             </div>
@@ -840,11 +903,13 @@ function AppContent() {
             <div className="hidden lg:block">
               <WebPurchaseHistoryPage
                 orders={orders}
+                isLoading={paymentsLoading}
+                onRefresh={loadPayments}
                 onBack={() => {
                   setShowPurchaseHistory(false);
                   setCurrentPage('profile');
                 }}
-                onPayOrder={handlePayOrder}
+                onPayOrder={undefined}
                 onCancelOrder={handleCancelOrder}
               />
             </div>
@@ -871,6 +936,7 @@ function AppContent() {
               setShowPaymentMethods(true);
             }}
             onAddCard={handleAddCard}
+            savedCards={savedCards}
             onWeatherClick={() => setShowWeather(true)}
             onLiveClick={() => setShowCameras(true)}
           />
@@ -1355,8 +1421,9 @@ function AppContent() {
        !showBookingDetails &&
        !showWorkingHours &&
        !showPaymentMethodModal &&
-       !showMilliCardModal &&
-       !showAktivbonkModal && (
+       !showPaymentWebView &&
+       !paymentUrlLoading &&
+       !showRegistration && (
         <ModernBottomNav
           activeTab={currentPage}
           onTabChange={(tab) => setCurrentPage(tab)}
@@ -1368,12 +1435,15 @@ function AppContent() {
 
 export default function App() {
   // Check URL for admin panel access - only via /admin path
-  const [isAdminPanel, setIsAdminPanel] = useState(
-    window.location.pathname === '/admin' || window.location.pathname.startsWith('/admin/')
-  );
+  const [isAdminPanel, setIsAdminPanel] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return window.location.pathname === '/admin' || window.location.pathname.startsWith('/admin/');
+  });
   
   // Listen for URL changes (both pathname and hash changes)
   useEffect(() => {
+    if (typeof window === 'undefined') return;
+    
     const checkAdminRoute = () => {
       const isAdmin = window.location.pathname === '/admin' || window.location.pathname.startsWith('/admin/');
       setIsAdminPanel(isAdmin);
@@ -1404,7 +1474,9 @@ export default function App() {
   return (
     <LanguageProvider>
       <ScrollPositionProvider>
-        <AppContent />
+        <AuthProvider>
+          <AppContent />
+        </AuthProvider>
       </ScrollPositionProvider>
     </LanguageProvider>
   );

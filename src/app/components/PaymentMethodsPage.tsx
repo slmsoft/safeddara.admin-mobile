@@ -1,5 +1,11 @@
+import { useState, useEffect } from 'react';
 import { ChevronLeft, Plus, CreditCard, Trash2 } from 'lucide-react';
 import cardBgImage from '../../assets/889d10c3b17d7055eb180318a9d532bee39a212e.png';
+import { cardsApi } from '../../api/cards';
+import { useAuth } from '../contexts/AuthContext';
+import { LoadingSpinner } from './LoadingSpinner';
+import { ErrorMessage } from './ErrorMessage';
+import type { Card } from '../../api/types';
 
 interface PaymentMethodsPageProps {
   onBack: () => void;
@@ -15,7 +21,68 @@ interface PaymentMethodsPageProps {
   onDeleteCard?: (cardId: string) => void;
 }
 
-export function PaymentMethodsPage({ onBack, onAddCard, savedCards = [], onDeleteCard, onWeatherClick, onLiveClick }: PaymentMethodsPageProps) {
+export function PaymentMethodsPage({ onBack, onAddCard, savedCards: propCards = [], onDeleteCard, onWeatherClick, onLiveClick }: PaymentMethodsPageProps) {
+  const { isAuthenticated } = useAuth();
+  const [cards, setCards] = useState<Card[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const loadCards = async () => {
+      if (!isAuthenticated) {
+        setIsLoading(false);
+        return;
+      }
+
+      setIsLoading(true);
+      setError(null);
+      try {
+        const response = await cardsApi.getAllCards();
+        if (response.success && response.data && typeof response.data === 'object') {
+          // API returns {"userCards": [...]} in data
+          const userCards = (response.data as any).userCards;
+          if (Array.isArray(userCards)) {
+          // Convert UserCard[] to Card[] format
+          const cardsData = userCards.map((uc: any, idx: number) => ({
+            id: `card-${uc.cardId ?? uc.id ?? idx}`,
+            pun: uc.cardMasked || '',
+            expMonth: uc.exp?.split('/')[0] || '',
+            expYear: uc.exp?.split('/')[1] || '',
+            holder: '',
+          }));
+            setCards(cardsData);
+          }
+        }
+      } catch (err: any) {
+        setError(err.message || 'Ошибка загрузки карт');
+        console.error('Error loading cards:', err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadCards();
+  }, [isAuthenticated]);
+
+  // Use API cards if available, otherwise fallback to prop cards
+  // API returns masked cards (e.g., "****1234"), extract last 4 digits for display
+  const handleDeleteCard = (id: string) => {
+    setCards((prev) => prev.filter((c: any) => c.id !== id));
+    onDeleteCard?.(id);
+  };
+
+  const savedCards = cards.length > 0 
+    ? cards.map((card, index) => {
+        const cardNumber = card.pun || '';
+        const last4 = cardNumber.length >= 4 ? cardNumber.slice(-4) : '';
+        return {
+          id: ((card as any).id ?? card.pun) || `card-${index}`,
+          cardNumber: last4 ? `****${last4}` : cardNumber,
+          expiry: card.expMonth && card.expYear ? `${card.expMonth}/${card.expYear}` : '',
+          cardType: card.pun?.startsWith('4') || card.pun?.includes('4') ? 'Visa' : card.pun?.startsWith('5') || card.pun?.includes('5') ? 'Mastercard' : 'Card',
+        };
+      })
+    : propCards;
   return (
     <div className="min-h-screen bg-white overflow-x-hidden" style={{ maxWidth: '402px', margin: '0 auto', width: '100%' }}>
       {/* Header */}
@@ -33,7 +100,16 @@ export function PaymentMethodsPage({ onBack, onAddCard, savedCards = [], onDelet
       </div>
 
       {/* Content */}
-      {savedCards.length === 0 ? (
+      {isLoading ? (
+        <div className="flex flex-col items-center justify-center px-8 pt-32">
+          <LoadingSpinner size="lg" />
+          <p className="text-gray-500 mt-4">Загрузка карт...</p>
+        </div>
+      ) : error ? (
+        <div className="px-4 pt-8">
+          <ErrorMessage message={error} onRetry={() => window.location.reload()} />
+        </div>
+      ) : savedCards.length === 0 ? (
         /* Empty state */
         <div className="flex flex-col items-center justify-center px-8 pt-32">
           <div className="w-20 h-20 rounded-full bg-gray-100 flex items-center justify-center mb-6">
@@ -76,7 +152,7 @@ export function PaymentMethodsPage({ onBack, onAddCard, savedCards = [], onDelet
                 {/* Delete Button - Fully inside card, not overlapping edges */}
                 {onDeleteCard && (
                   <button
-                    onClick={() => onDeleteCard(card.id)}
+                    onClick={() => handleDeleteCard(card.id)}
                     className="absolute top-4 right-4 w-9 h-9 rounded-full bg-red-500 flex items-center justify-center hover:bg-red-600 transition-all shadow-lg z-20 active:scale-95"
                     style={{
                       top: '16px',

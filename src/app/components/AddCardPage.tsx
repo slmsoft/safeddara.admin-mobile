@@ -1,7 +1,9 @@
-import { ChevronLeft, CreditCard, CheckCircle, X } from 'lucide-react';
-import { useState } from 'react';
-import milliCardLogo from '../../assets/cb437bc156df0f27af54b856b636f303c0794bb5.png';
+import { ChevronLeft, CreditCard, CheckCircle } from 'lucide-react';
+import { useState, useRef } from 'react';
 import cardBgImage from '../../assets/889d10c3b17d7055eb180318a9d532bee39a212e.png';
+import { cardsApi } from '../../api/cards';
+import { useAuth } from '../contexts/AuthContext';
+import type { Card } from '../../api/types';
 
 interface AddCardPageProps {
   onBack: () => void;
@@ -13,10 +15,15 @@ interface AddCardPageProps {
 }
 
 export function AddCardPage({ onBack, onAddCard, onWeatherClick, onLiveClick, onDeleteCard, savedCards }: AddCardPageProps) {
+  const { isAuthenticated } = useAuth();
   const [cardNumber, setCardNumber] = useState('');
   const [cvv, setCvv] = useState('');
   const [expiry, setExpiry] = useState('');
+  const [holder, setHolder] = useState('');
   const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const submittingRef = useRef(false);
 
   const formatCardNumber = (value: string) => {
     const numbers = value.replace(/\s/g, '');
@@ -33,10 +40,8 @@ export function AddCardPage({ onBack, onAddCard, onWeatherClick, onLiveClick, on
   };
 
   const handleCardNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value.replace(/\D/g, '');
-    if (value.length <= 16) {
-      setCardNumber(formatCardNumber(value));
-    }
+    const value = e.target.value.replace(/\D/g, '').slice(0, 16); // Строго 16 цифр — защита от дублирования при вставке
+    setCardNumber(formatCardNumber(value));
   };
 
   const handleCvvChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -53,14 +58,60 @@ export function AddCardPage({ onBack, onAddCard, onWeatherClick, onLiveClick, on
     }
   };
 
-  const handleSave = () => {
-    console.log('Сохранение карты:', { cardNumber, cvv, expiry });
-    setShowSuccessModal(true);
+  const getLast4 = (num: string) => (num.replace(/\s/g, '') || num).slice(-4);
+  const isCardAlreadySaved = (enteredLast4: string) =>
+    (savedCards ?? []).some((c) => getLast4(c.cardNumber) === enteredLast4);
+
+  const handleSave = async () => {
+    if (!isAuthenticated) {
+      setError('Необходима авторизация для сохранения карты');
+      return;
+    }
+    const last4 = getLast4(cardNumber);
+    if (isCardAlreadySaved(last4)) {
+      setError('Эта карта уже добавлена');
+      return;
+    }
+    if (submittingRef.current) return;
+    submittingRef.current = true;
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      // Parse expiry
+      const [expMonth, expYear] = expiry.split('/');
+      
+      // Swagger entities.Card: pan (required), cvv, expMonth, expYear, holder
+      const cardData: Card = {
+        pan: cardNumber.replace(/\s/g, ''),
+        cvv: cvv || undefined,
+        expMonth: expMonth || undefined,
+        expYear: expYear || undefined,
+        holder: holder.trim() || undefined,
+      };
+
+      const response = await cardsApi.addCard(cardData);
+      if (response.success) {
+        // API returns {"userCard": {...}} in data, but we don't need it for success modal
+        setShowSuccessModal(true);
+      } else {
+        setError(response.message || 'Ошибка при сохранении карты');
+      }
+    } catch (err: any) {
+      const msg = err?.message || err?.response?.data?.message || '';
+      setError(
+        /duplicate|23505|unique constraint/i.test(String(msg))
+          ? 'Эта карта уже добавлена'
+          : msg || 'Ошибка при сохранении карты'
+      );
+      console.error('Error adding card:', err);
+    } finally {
+      submittingRef.current = false;
+      setIsLoading(false);
+    }
   };
 
   const handleConfirm = () => {
-    // Here you would actually save the card to backend/storage
-    console.log('Карта подтверждена и сохранена');
     onAddCard(cardNumber, expiry);
     setShowSuccessModal(false);
   };
@@ -100,7 +151,7 @@ export function AddCardPage({ onBack, onAddCard, onWeatherClick, onLiveClick, on
         <div className="space-y-4">
           {/* Info Text */}
           <p className="text-gray-600 text-sm text-center px-4">
-            Введите данные вашей карты <span className="font-semibold text-gray-900">Корти Милли</span>
+            Введите данные банковской карты
           </p>
 
           {/* Card Number */}
@@ -118,6 +169,20 @@ export function AddCardPage({ onBack, onAddCard, onWeatherClick, onLiveClick, on
             <div className="absolute right-4 top-[42px]">
               <CreditCard className="w-5 h-5 text-[#D4AF37]" />
             </div>
+          </div>
+
+          {/* Card Holder Name */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Имя держателя карты (необязательно)
+            </label>
+            <input
+              type="text"
+              value={holder}
+              onChange={(e) => setHolder(e.target.value)}
+              placeholder="IVAN IVANOV"
+              className="w-full px-4 py-4 bg-gray-50 rounded-2xl border border-gray-200 focus:outline-none focus:border-[#D4AF37] focus:bg-white transition-all text-gray-900 placeholder:text-gray-400 uppercase"
+            />
           </div>
 
           {/* CVV and Expiry */}
@@ -149,13 +214,20 @@ export function AddCardPage({ onBack, onAddCard, onWeatherClick, onLiveClick, on
             </div>
           </div>
 
+          {/* Error Message */}
+          {error && (
+            <div className="p-3 bg-red-50 border border-red-200 rounded-xl">
+              <p className="text-red-600 text-sm text-center">{error}</p>
+            </div>
+          )}
+
           {/* Save Button */}
           <button
             onClick={handleSave}
-            disabled={!cardNumber || !cvv || !expiry || cardNumber.replace(/\s/g, '').length !== 16}
+            disabled={!cardNumber || !cvv || !expiry || cardNumber.replace(/\s/g, '').length !== 16 || isLoading || !isAuthenticated}
             className="w-full py-4 bg-gray-200 text-gray-400 rounded-2xl font-semibold text-base disabled:opacity-100 enabled:bg-gradient-to-r enabled:from-[#D4AF37] enabled:to-[#F4D03F] enabled:text-white enabled:shadow-lg enabled:shadow-yellow-200 transition-all mt-6"
           >
-            Сохранить карту
+            {isLoading ? 'Сохранение...' : 'Сохранить карту'}
           </button>
         </div>
       </div>
@@ -176,7 +248,7 @@ export function AddCardPage({ onBack, onAddCard, onWeatherClick, onLiveClick, on
 
             {/* Description */}
             <p className="text-gray-500 text-center mb-6 leading-relaxed">
-              Карта Корти Милли **** {cardNumber.slice(-4)} будет добавлена в методы оплаты
+              Карта **** {cardNumber.slice(-4)} будет добавлена в методы оплаты
             </p>
 
             {/* Buttons */}

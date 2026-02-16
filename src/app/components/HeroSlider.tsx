@@ -1,24 +1,11 @@
 import { useState, useEffect } from 'react';
 import { ChevronRight, ChevronLeft } from 'lucide-react';
 import wallpaper1 from '../../assets/wallpaper1.jpg';
-import wallpaper2 from '../../assets/wallpaper2.mp4';
-import wallpaper3 from '../../assets/wallpaper3.mp4';
 
 const slides = [
   {
     id: 1,
-    image: wallpaper1,
-    type: 'image' as const
-  },
-  {
-    id: 2,
-    video: wallpaper2,
-    type: 'video' as const
-  },
-  {
-    id: 3,
-    video: wallpaper3,
-    type: 'video' as const
+    image: wallpaper1
   }
 ];
 
@@ -51,24 +38,14 @@ export function HeroSlider() {
             index === currentSlide ? 'opacity-100' : 'opacity-0'
           }`}
         >
-          {/* Background Image or Video */}
-          {slide.type === 'image' && slide.image ? (
-          <img 
-            className="w-full h-full object-cover" 
-            src={slide.image} 
-            alt={`Slide ${slide.id}`}
-          />
-          ) : slide.type === 'video' && slide.video ? (
-            <video 
-              className="w-full h-full object-cover"
-              autoPlay
-              loop
-              muted
-              playsInline
-            >
-              <source src={slide.video} type="video/mp4" />
-            </video>
-          ) : null}
+          {/* Background Image */}
+          {slide.image && (
+            <img 
+              className="w-full h-full object-cover" 
+              src={slide.image} 
+              alt={`Slide ${slide.id}`}
+            />
+          )}
 
           {/* Gradient Overlay for better text readability - Mobile only */}
           <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-transparent lg:hidden" />

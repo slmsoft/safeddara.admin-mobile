@@ -5,9 +5,10 @@ import { SafeddaraLogo } from './SafeddaraLogo';
 
 interface Step1Props {
   onNext: (name: string, phone: string) => void;
+  onSwitchToLogin?: () => void;
 }
 
-export function Step1({ onNext }: Step1Props) {
+export function Step1({ onNext, onSwitchToLogin }: Step1Props) {
   const [name, setName] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
 
@@ -113,6 +114,19 @@ export function Step1({ onNext }: Step1Props) {
                 <span className="text-white/90 font-medium underline underline-offset-2">условиями использования</span>
               </p>
             </form>
+
+            {/* Switch to Login */}
+            {onSwitchToLogin && (
+              <div className="mt-6 text-center">
+                <button
+                  type="button"
+                  onClick={onSwitchToLogin}
+                  className="text-white/80 hover:text-white text-sm transition-colors"
+                >
+                  Уже есть аккаунт? <span className="font-semibold underline">Войти</span>
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>
