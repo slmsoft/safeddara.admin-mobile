@@ -11,9 +11,10 @@ interface AddCardPageProps {
   onLiveClick?: () => void;
   onDeleteCard?: (cardId: string) => void;
   savedCards?: any[];
+  onNeedLogin?: () => void;
 }
 
-export function AddCardPage({ onBack, onAddCard, savedCards }: AddCardPageProps) {
+export function AddCardPage({ onBack, onAddCard, savedCards, onNeedLogin }: AddCardPageProps) {
   const { isAuthenticated } = useAuth();
   const [cardNumber, setCardNumber] = useState('');
   const [cvv, setCvv] = useState('');
@@ -40,7 +41,7 @@ export function AddCardPage({ onBack, onAddCard, savedCards }: AddCardPageProps)
 
   const handleSave = async () => {
     if (!isAuthenticated) {
-      setError('Необходима авторизация');
+      setError('Сессия истекла или вы не вошли в аккаунт. Войдите снова.');
       return;
     }
     if (isCardAlreadySaved(getLast4(cardNumber))) {
@@ -132,7 +133,18 @@ export function AddCardPage({ onBack, onAddCard, savedCards }: AddCardPageProps)
           />
 
           {error && (
-            <p className="text-red-500 text-sm text-center">{error}</p>
+            <div className="space-y-2">
+              <p className="text-red-500 text-sm text-center">{error}</p>
+              {!isAuthenticated && onNeedLogin && (
+                <button
+                  type="button"
+                  onClick={onNeedLogin}
+                  className="w-full py-2.5 rounded-lg bg-[#71bcf0] text-white text-sm font-medium hover:bg-[#5aa8e0] transition-colors"
+                >
+                  Войти в аккаунт
+                </button>
+              )}
+            </div>
           )}
         </div>
 
