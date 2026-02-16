@@ -3,14 +3,50 @@
  * GET /cards/all, POST /cards/add, POST /orders/products/create, GET /payments/all
  */
 import { useState, useRef } from 'react';
-import { CreditCard, Plus } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import { cardsApi } from '../../api/cards';
 import type { Card } from '../../api/types';
+
+interface SavedCardItem {
+  id: string;
+  cardNumber: string;
+  expiry: string;
+  cardType: string;
+}
+
+function CardIconSmall({ cardType }: { cardType: string }) {
+  const isVisa = /visa|vsa|^4/i.test(cardType);
+  const isMc = /master|mcr|^5/i.test(cardType);
+  return (
+    <div
+      className={`w-12 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${
+        isVisa ? 'bg-gradient-to-br from-[#1A1F71] to-[#2D3A9F]' : isMc ? 'bg-gradient-to-br from-[#EB001B] to-[#F79E1B]' : 'bg-gray-800'
+      }`}
+    >
+      {isVisa ? (
+        <span className="text-white font-bold text-[9px] tracking-wider">VISA</span>
+      ) : isMc ? (
+        <div className="flex -space-x-1">
+          <div className="w-2.5 h-2.5 rounded-full bg-red-500" />
+          <div className="w-2.5 h-2.5 rounded-full bg-amber-400 opacity-90" />
+        </div>
+      ) : (
+        <span className="text-white/80 text-[7px] font-medium">MILLI</span>
+      )}
+    </div>
+  );
+}
+
+function getCardTypeLabel(cardType: string): string {
+  if (/visa|vsa/i.test(cardType)) return 'Visa Gold';
+  if (/master|mcr/i.test(cardType)) return 'Mastercard Platinum';
+  return 'Корти Милли';
+}
 
 interface PaymentMethodModalProps {
   isOpen: boolean;
   onClose: () => void;
-  savedCards: Array<{ id: string; cardNumber: string; expiry: string; cardType: string }>;
+  savedCards: Array<SavedCardItem>;
   onCreateOrder: (cardId: number) => Promise<void>;
 }
 
@@ -119,26 +155,23 @@ export function PaymentMethodModal({
                 key={card.id}
                 onClick={() => handleSelectCard(card.id)}
                 disabled={isLoading}
-                className="w-full flex items-center justify-between gap-4 p-4 rounded-2xl bg-gray-50 hover:bg-gray-100 transition-all active:scale-[0.98] disabled:opacity-50"
+                className="w-full flex items-center gap-4 p-4 rounded-xl bg-gray-50 hover:bg-gray-100 border border-gray-100 transition-all active:scale-[0.98] disabled:opacity-50 text-left"
               >
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-lg bg-gray-800 flex items-center justify-center flex-shrink-0">
-                    <CreditCard className="w-6 h-6 text-white" />
-                  </div>
-                  <span className="text-base font-medium text-gray-900">
-                    •••• {card.cardNumber.slice(-4)}
-                  </span>
+                <CardIconSmall cardType={card.cardType} />
+                <div className="flex-1 min-w-0">
+                  <p className="font-bold text-gray-900 text-sm">{getCardTypeLabel(card.cardType)}</p>
+                  <p className="text-gray-500 text-xs mt-0.5">•••• {card.cardNumber.slice(-4)}</p>
                 </div>
               </button>
             ))}
             <button
               onClick={() => setShowAddForm(true)}
-              className="w-full flex items-center gap-4 p-4 rounded-2xl bg-gray-50 hover:bg-gray-100 transition-all active:scale-[0.98] border-2 border-dashed border-gray-300"
+              className="w-full flex items-center gap-4 p-4 rounded-xl border-2 border-dashed border-gray-300 hover:border-[#71bcf0] hover:bg-blue-50/30 transition-all"
             >
-              <div className="w-12 h-12 rounded-full bg-gray-200 flex items-center justify-center flex-shrink-0">
-                <Plus className="w-6 h-6 text-gray-500" strokeWidth={2.5} />
+              <div className="w-12 h-9 rounded-lg bg-gray-200 flex items-center justify-center flex-shrink-0">
+                <Plus className="w-5 h-5 text-gray-500" strokeWidth={2.5} />
               </div>
-              <span className="text-base font-medium text-gray-700">Добавить карту</span>
+              <span className="font-medium text-gray-700">Добавить карту</span>
             </button>
           </div>
         ) : (

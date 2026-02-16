@@ -399,11 +399,12 @@ function AppContent() {
             const digits = masked.replace(/\D/g, '');
             const last4 = digits.length >= 4 ? digits.slice(-4) : (masked.length >= 4 ? masked.slice(-4) : '');
             const exp = (uc.exp ?? uc.expiry ?? (uc.expMonth != null && uc.expYear != null ? `${uc.expMonth}/${uc.expYear}` : '')).toString();
+            const derivedType = digits.startsWith('4') ? 'Visa' : digits.startsWith('5') ? 'Mastercard' : 'Milli';
             return {
               id: `card-${cardId}`,
               cardNumber: last4 ? `****${last4}` : masked || '••••',
               expiry: exp,
-              cardType: uc.cardBrand ?? uc.cardType ?? 'Card',
+              cardType: uc.cardBrand ?? uc.cardType ?? derivedType,
             };
           });
           setSavedCards(cards);

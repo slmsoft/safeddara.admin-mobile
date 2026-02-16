@@ -25,13 +25,13 @@ export function FavoritesPage({ onBack, favorites = [], onItemClick, onRemoveFav
         <div className="px-5 py-4">
           <div className="flex items-center gap-4">
             <button
-              onClick={() => onBack && onBack()}
-              className="transition-all active:scale-95"
+              onClick={() => onBack?.()}
+              className="transition-all active:scale-95 flex-shrink-0 z-10 relative"
               type="button"
             >
               <ChevronLeft className="w-5 h-5 text-[#71bcf0]" />
             </button>
-            <div className="flex-1 text-center -ml-11">
+            <div className="flex-1 text-center -ml-11 pointer-events-none">
               <h1 className="text-base font-semibold text-gray-900">Избранное</h1>
               <p className="text-sm text-gray-400">{favorites.length} {favorites.length === 1 ? 'товар' : favorites.length > 1 && favorites.length < 5 ? 'товара' : 'товаров'}</p>
             </div>
