@@ -1,9 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { ChevronLeft, Calendar, Users, Minus, Plus, ChevronRight, Wifi, Coffee, Tv, Wind, ShowerHead, UtensilsCrossed } from 'lucide-react';
 import { ModernHeader } from './ModernHeader';
-import Slider from 'react-slick';
-import 'slick-carousel/slick/slick.css';
-import 'slick-carousel/slick/slick-theme.css';
 
 interface HotelBookingPageProps {
   room: {
@@ -14,6 +12,7 @@ interface HotelBookingPageProps {
     beds: number;
     price: number;
     image: string;
+    images?: string[];
   };
   onBack: () => void;
   onContinue: (booking: BookingData) => void;
@@ -44,6 +43,8 @@ export function HotelBookingPage({ room, onBack, onContinue, onWeatherClick, onL
   const [isSelectingCheckIn, setIsSelectingCheckIn] = useState(true);
   const [guestName, setGuestName] = useState('');
   const [guestEmail, setGuestEmail] = useState('');
+  const [galleryOpen, setGalleryOpen] = useState(false);
+  const [galleryIndex, setGalleryIndex] = useState(0);
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -86,14 +87,16 @@ export function HotelBookingPage({ room, onBack, onContinue, onWeatherClick, onL
 
   const canContinue = checkIn && checkOut && guests > 0 && guestName.trim().length > 0 && guestEmail.trim().length > 0;
 
-  // Gallery images for the room
-  const roomImages = [
-    room.image,
+  // Фото номера: из API или fallback
+  const fallbackImages = [
     'https://images.unsplash.com/photo-1611892440504-42a792e24d32?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=800',
     'https://images.unsplash.com/photo-1522771739844-6a9f6d5f14af?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=800',
     'https://images.unsplash.com/photo-1631049307264-da0ec9d70304?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=800',
     'https://images.unsplash.com/photo-1540518614846-7eded433c457?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=800',
   ];
+  const roomImages = (room.images && room.images.length > 0)
+    ? room.images
+    : [room.image, ...fallbackImages];
 
   const amenities = [
     { icon: Wifi, label: 'Wi-Fi' },
@@ -104,16 +107,7 @@ export function HotelBookingPage({ room, onBack, onContinue, onWeatherClick, onL
     { icon: UtensilsCrossed, label: 'Завтрак' },
   ];
 
-  const sliderSettings = {
-    dots: true,
-    infinite: true,
-    speed: 500,
-    slidesToShow: 1,
-    slidesToScroll: 1,
-    autoplay: false,
-    arrows: false,
-    dotsClass: 'slick-dots custom-dots',
-  };
+  const remainingCount = roomImages.length > 5 ? roomImages.length - 5 : 0;
 
   return (
     <div className="min-h-screen bg-gray-50 pb-24 lg:pb-8">
@@ -159,23 +153,53 @@ export function HotelBookingPage({ room, onBack, onContinue, onWeatherClick, onL
           
           {/* Left Column - Room Details */}
           <div className="space-y-4">
-            {/* Photo Gallery */}
+            {/* Photo Gallery — сетка вместо слайдера */}
             <div className="bg-white rounded-2xl shadow-sm overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-500">
-              <div className="room-gallery">
-                <Slider {...sliderSettings}>
-                  {roomImages.map((image, index) => (
-                    <div key={index} className="slider-item">
-                      <div className="h-64 lg:h-96 w-full">
-                        <img
-                          src={image}
-                          alt={`${room.name} - фото ${index + 1}`}
-                          className="w-full h-full object-cover"
-                        />
-                      </div>
+              <div className="grid grid-cols-6 grid-rows-2 gap-1 p-1">
+                {/* Верхний ряд: 2 фото (по 50%) */}
+                <button
+                  type="button"
+                  onClick={() => { setGalleryIndex(0); setGalleryOpen(true); }}
+                  className="col-span-3 aspect-[4/3] overflow-hidden rounded-tl-xl cursor-pointer block text-left"
+                >
+                  <img src={roomImages[0] || room.image} alt={`${room.name} - фото 1`} className="w-full h-full object-cover" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setGalleryIndex(1); setGalleryOpen(true); }}
+                  className="col-span-3 aspect-[4/3] overflow-hidden rounded-tr-xl cursor-pointer block text-left"
+                >
+                  <img src={roomImages[1] || room.image} alt={`${room.name} - фото 2`} className="w-full h-full object-cover" />
+                </button>
+                {/* Нижний ряд: 3 фото (по 33%) */}
+                <button
+                  type="button"
+                  onClick={() => { setGalleryIndex(2); setGalleryOpen(true); }}
+                  className="col-span-2 aspect-[4/3] overflow-hidden rounded-bl-xl cursor-pointer block text-left"
+                >
+                  <img src={roomImages[2] || room.image} alt={`${room.name} - фото 3`} className="w-full h-full object-cover" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setGalleryIndex(3); setGalleryOpen(true); }}
+                  className="col-span-2 aspect-[4/3] overflow-hidden cursor-pointer block text-left"
+                >
+                  <img src={roomImages[3] || room.image} alt={`${room.name} - фото 4`} className="w-full h-full object-cover" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setGalleryIndex(4); setGalleryOpen(true); }}
+                  className="col-span-2 aspect-[4/3] overflow-hidden rounded-br-xl relative cursor-pointer block text-left"
+                >
+                  <img src={roomImages[4] || room.image} alt={`${room.name} - фото 5`} className="w-full h-full object-cover" />
+                  {remainingCount > 0 && (
+                    <div className="absolute inset-0 bg-black/50 flex items-center justify-center pointer-events-none">
+                      <span className="text-2xl font-bold text-white">+{remainingCount}</span>
                     </div>
-                  ))}
-                </Slider>
+                  )}
+                </button>
               </div>
+
               
               {/* Room Details */}
               <div className="p-4 lg:p-6">
@@ -394,7 +418,8 @@ export function HotelBookingPage({ room, onBack, onContinue, onWeatherClick, onL
               </div>
             )}
 
-            {/* Continue Button - Desktop */}
+            {/* Continue Button - Desktop (скрыт при открытой галерее) */}
+            {!galleryOpen && (
             <div className="hidden lg:block">
               <button
                 onClick={handleContinue}
@@ -409,11 +434,13 @@ export function HotelBookingPage({ room, onBack, onContinue, onWeatherClick, onL
                 <ChevronRight className="w-5 h-5" />
               </button>
             </div>
+            )}
           </div>
         </div>
       </div>
 
-      {/* Fixed Bottom Button - Mobile Only */}
+      {/* Fixed Bottom Button - Mobile Only (скрыт при открытой галерее) */}
+      {!galleryOpen && (
       <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-6 py-4 z-40">
         <div className="max-w-[402px] mx-auto">
           <button
@@ -430,6 +457,19 @@ export function HotelBookingPage({ room, onBack, onContinue, onWeatherClick, onL
           </button>
         </div>
       </div>
+      )}
+
+      {/* Lightbox — рендер в body, выше всего контента */}
+      {galleryOpen && createPortal(
+        <ImageGalleryLightbox
+          images={roomImages}
+          currentIndex={galleryIndex}
+          onClose={() => setGalleryOpen(false)}
+          onIndexChange={setGalleryIndex}
+          roomName={room.name}
+        />,
+        document.body
+      )}
 
       <style>{`
         @keyframes fade-in {
@@ -443,36 +483,120 @@ export function HotelBookingPage({ room, onBack, onContinue, onWeatherClick, onL
         .animate-in {
           animation-fill-mode: both;
         }
-        
-        /* Slider Styles */
-        .room-gallery .slick-slider {
-          position: relative;
-        }
-        
-        .room-gallery .slick-dots {
-          bottom: 15px;
-          z-index: 10;
-        }
-        
-        .room-gallery .slick-dots li {
-          margin: 0 3px;
-        }
-        
-        .room-gallery .slick-dots li button:before {
-          font-size: 10px;
-          color: white;
-          opacity: 0.5;
-        }
-        
-        .room-gallery .slick-dots li.slick-active button:before {
-          opacity: 1;
-          color: #71bcf0;
-        }
-        
-        .slider-item {
-          outline: none;
-        }
       `}</style>
+    </div>
+  );
+}
+
+// Lightbox для полноразмерного просмотра с возможностью слайда
+interface ImageGalleryLightboxProps {
+  images: string[];
+  currentIndex: number;
+  onClose: () => void;
+  onIndexChange: (index: number) => void;
+  roomName: string;
+}
+
+function ImageGalleryLightbox({ images, currentIndex, onClose, onIndexChange, roomName }: ImageGalleryLightboxProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const touchStartRef = useRef<{ x: number; y: number } | null>(null);
+  const touchCurrentRef = useRef<{ x: number; y: number } | null>(null);
+
+  const minSwipeDistance = 50;
+  const minSwipeDownToClose = 80;
+
+  const goPrev = () => onIndexChange(currentIndex <= 0 ? images.length - 1 : currentIndex - 1);
+  const goNext = () => onIndexChange(currentIndex >= images.length - 1 ? 0 : currentIndex + 1);
+
+  const onTouchStart = (e: React.TouchEvent) => {
+    touchStartRef.current = { x: e.targetTouches[0].clientX, y: e.targetTouches[0].clientY };
+    touchCurrentRef.current = { x: e.targetTouches[0].clientX, y: e.targetTouches[0].clientY };
+  };
+  const onTouchMove = (e: React.TouchEvent) => {
+    touchCurrentRef.current = { x: e.targetTouches[0].clientX, y: e.targetTouches[0].clientY };
+  };
+  const onTouchEnd = () => {
+    const start = touchStartRef.current;
+    const end = touchCurrentRef.current;
+    touchStartRef.current = null;
+    touchCurrentRef.current = null;
+    if (!start || !end) return;
+    const deltaX = start.x - end.x;
+    const deltaY = end.y - start.y; // вниз = положительное
+    const absX = Math.abs(deltaX);
+    const absY = Math.abs(deltaY);
+    // Свайп вниз — закрыть
+    if (absY > absX && deltaY > minSwipeDownToClose) {
+      onClose();
+      return;
+    }
+    // Свайп влево/вправо — переключить фото
+    if (absX > minSwipeDistance) {
+      deltaX > 0 ? goNext() : goPrev();
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Escape') onClose();
+    if (e.key === 'ArrowLeft') goPrev();
+    if (e.key === 'ArrowRight') goNext();
+  };
+
+  useEffect(() => {
+    containerRef.current?.focus();
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = ''; };
+  }, []);
+
+  return (
+    <div
+      ref={containerRef}
+      className="fixed inset-0 z-[99999] bg-black flex flex-col"
+      onClick={(e) => e.target === e.currentTarget && onClose()}
+      onKeyDown={handleKeyDown}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Галерея фото. Свайп вниз — закрыть."
+      tabIndex={0}
+    >
+      {/* Счётчик */}
+      <div className="absolute top-4 left-4 z-10 px-4 py-2 rounded-full bg-black/50 text-white text-sm font-medium">
+        {currentIndex + 1} / {images.length}
+      </div>
+
+      {/* Контент: стрелки + изображение */}
+      <div className="flex-1 flex items-center justify-center min-h-0 relative">
+        <button
+          onClick={goPrev}
+          className="absolute left-2 lg:left-6 z-10 w-12 h-12 rounded-full bg-white/10 flex items-center justify-center text-white hover:bg-white/20 transition-colors active:scale-95"
+          aria-label="Предыдущее фото"
+        >
+          <ChevronLeft className="w-8 h-8" />
+        </button>
+
+        <div
+          className="flex-1 flex items-center justify-center p-4 overflow-hidden"
+          onTouchStart={onTouchStart}
+          onTouchMove={onTouchMove}
+          onTouchEnd={onTouchEnd}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <img
+            src={images[currentIndex] || images[0]}
+            alt={`${roomName} - фото ${currentIndex + 1}`}
+            className="max-w-full max-h-[85vh] w-auto h-auto object-contain select-none pointer-events-none"
+            draggable={false}
+          />
+        </div>
+
+        <button
+          onClick={goNext}
+          className="absolute right-2 lg:right-6 z-10 w-12 h-12 rounded-full bg-white/10 flex items-center justify-center text-white hover:bg-white/20 transition-colors active:scale-95"
+          aria-label="Следующее фото"
+        >
+          <ChevronRight className="w-8 h-8" />
+        </button>
+      </div>
     </div>
   );
 }

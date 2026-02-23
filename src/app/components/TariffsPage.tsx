@@ -402,10 +402,10 @@ export function TariffsPage({ onBack, onWeatherClick, onLiveClick, onAddToCart, 
           <h1 className="hidden lg:block text-3xl font-bold text-gray-900">{selectedCategoryData?.name}</h1>
         </div>
 
-        {/* Items Grid - Mobile: 1 col, Desktop: 4 cols */}
-        <div className="px-5 lg:px-0 pt-5 lg:pt-8 pb-24 lg:pb-16 grid grid-cols-1 lg:grid-cols-4 gap-4 lg:gap-6">
+        {/* Items Grid - Mobile: 1 col, Desktop: 2 cols */}
+        <div className="px-5 lg:px-0 pt-5 lg:pt-8 pb-24 lg:pb-16 grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6">
           {selectedCategoryData?.items.map((item, index) => (
-            <TariffCard key={item.id} item={item} index={index} onAddToCart={onAddToCart} onSelect={handleTariffSelect} />
+            <TariffCard key={item.id} item={item} categoryName={selectedCategoryData?.name || ''} index={index} onAddToCart={onAddToCart} onSelect={handleTariffSelect} />
           ))}
         </div>
       </div>
@@ -443,22 +443,23 @@ export function TariffsPage({ onBack, onWeatherClick, onLiveClick, onAddToCart, 
 
 interface TariffCardProps {
   item: TariffItem;
+  categoryName: string;
   index: number;
   onAddToCart?: (categoryName: string, tariff: TariffItem, options: TariffOption[], date: string) => void;
   onSelect?: (tariff: TariffItem) => void;
 }
 
-function TariffCard({ item, index, onAddToCart, onSelect }: TariffCardProps) {
+function TariffCard({ item, categoryName, index, onAddToCart, onSelect }: TariffCardProps) {
   return (
     <button
-      className="w-full group bg-white rounded-2xl overflow-hidden hover:shadow-xl transition-all duration-300 cursor-pointer"
+      className="w-full flex rounded-2xl overflow-hidden bg-white shadow-md hover:shadow-xl transition-all duration-300 cursor-pointer active:scale-[0.99] group"
       style={{
         animation: `fadeInUp 0.4s ease-out ${index * 0.05}s backwards`
       }}
       onClick={() => onSelect && onSelect(item)}
     >
-      {/* Image - вертикальная карточка */}
-      <div className="relative h-36 lg:h-48 overflow-hidden bg-gray-100">
+      {/* Image - левая часть ~40% */}
+      <div className="relative w-[40%] min-w-[120px] aspect-[4/5] flex-shrink-0 overflow-hidden">
         <img
           alt={item.name}
           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
@@ -466,16 +467,26 @@ function TariffCard({ item, index, onAddToCart, onSelect }: TariffCardProps) {
         />
       </div>
 
-      {/* Content */}
-      <div className="p-4 lg:p-5">
-        <p className="text-sm lg:text-base text-gray-800 leading-relaxed line-clamp-2 mb-3 font-medium text-left">
-          {item.name}
-        </p>
+      {/* Content - правая часть ~60% */}
+      <div className="flex-1 min-w-0 p-4 lg:p-5 flex flex-col justify-between text-left">
+        <div>
+          <p className="text-xs text-gray-500 mb-1">{categoryName}</p>
+          <h3 className="text-base lg:text-lg font-bold text-gray-900 mb-0.5">{item.name}</h3>
+          {item.description && item.description !== item.name && (
+            <p className="text-sm text-gray-800 line-clamp-2">{item.description}</p>
+          )}
+        </div>
         
-        {/* Price */}
-        <div className="flex items-center justify-between">
-          <span className="text-lg lg:text-xl font-bold text-[#71bcf0]">{item.price}</span>
-          <span className="text-xs lg:text-sm text-gray-500">в день</span>
+        {/* Bottom row: Время | Цена */}
+        <div className="flex justify-between items-end mt-3 pt-3 border-t border-gray-100 gap-4">
+          <div>
+            <p className="text-xs text-gray-500">Время</p>
+            <p className="text-sm font-bold text-gray-900">8:30–17:00</p>
+          </div>
+          <div className="text-right">
+            <p className="text-xs text-gray-500">Цена</p>
+            <p className="text-base font-bold text-[#5ba8e0]">{item.price}</p>
+          </div>
         </div>
       </div>
     </button>

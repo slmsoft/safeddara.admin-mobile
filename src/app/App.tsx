@@ -208,14 +208,25 @@ function AppContent() {
       await backendApi.getAllPayments();
       const res = await backendApi.getBookings();
       if (res.success && res.data?.bookings && Array.isArray(res.data.bookings)) {
+        const todayStart = new Date();
+        todayStart.setHours(0, 0, 0, 0);
         const mapped: Booking[] = (res.data.bookings as any[]).map((b) => {
           const acc = b.accommodation || {};
-          const statusMap: Record<string, Booking['status']> = {
-            pending: 'pending', pending_payment: 'pending', confirmed: 'active',
-            completed: 'completed', cancelled: 'cancelled',
-          };
           const checkInRaw = typeof b.checkIn === 'string' ? b.checkIn : new Date(b.checkIn).toISOString();
           const checkOutRaw = typeof b.checkOut === 'string' ? b.checkOut : new Date(b.checkOut).toISOString();
+          const checkOutDate = new Date(checkOutRaw);
+          checkOutDate.setHours(0, 0, 0, 0);
+          // Логика статуса: pending/cancelled из API; confirmed → active если впереди, completed если уже прошло
+          let status: Booking['status'];
+          if (b.status === 'cancelled') {
+            status = 'cancelled';
+          } else if (b.status === 'pending' || b.status === 'pending_payment') {
+            status = 'pending';
+          } else if (b.status === 'confirmed' || b.status === 'completed') {
+            status = checkOutDate < todayStart ? 'completed' : 'active';
+          } else {
+            status = 'active';
+          }
           return {
             id: b.id,
             roomName: acc.title || 'Номер',
@@ -227,7 +238,7 @@ function AppContent() {
             guests: b.guests ?? 1,
             nights: b.nights ?? 1,
             totalPrice: b.totalPrice ?? 0,
-            status: statusMap[b.status] ?? 'active',
+            status,
             bookingDate: b.createdAt ? new Date(b.createdAt).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
           };
         });

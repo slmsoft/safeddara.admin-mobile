@@ -452,7 +452,8 @@ export function HotelsPage({ onWeatherClick, onLiveClick, onBack, onRoomSelect, 
                         area: activeTab === 'cottages' ? 80 : 45,
                         beds: item.capacity,
                         price: item.price,
-                        image: item.images[0]
+                        image: item.images?.[0] || '',
+                        images: item.images?.length ? item.images : undefined
                       })}
                     >
                       Забронировать

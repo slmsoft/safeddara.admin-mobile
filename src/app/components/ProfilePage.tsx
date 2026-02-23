@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { User, Clock, Heart, Info, FileCheck, ChevronRight, Ticket, CreditCard, LogOut } from 'lucide-react';
+import { User, Clock, Heart, Info, FileCheck, ChevronRight, Ticket, CreditCard, LogOut, ExternalLink } from 'lucide-react';
 import { ModernHeader } from './ModernHeader';
 
 interface ProfilePageProps {
@@ -137,7 +137,23 @@ export function ProfilePage({
                 );
               })}
               
-              {/* Logout Button */}
+              {/* Powered by SLMTECH — выделено для заметности */}
+              <a
+                href="https://www.instagram.com/slm_technology/?hl=ru"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full bg-gradient-to-r from-[#71bcf0]/10 to-[#71bcf0]/5 border-2 border-[#71bcf0]/30 rounded-2xl p-4 hover:shadow-lg hover:border-[#71bcf0]/50 transition-all flex items-center justify-between block"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-[#71bcf0]/20 flex items-center justify-center">
+                    <ExternalLink className="w-5 h-5 text-[#71bcf0]" />
+                  </div>
+                  <span className="text-base font-semibold text-gray-900">Powered by <span className="text-[#71bcf0] font-bold">SLMTECH</span></span>
+                </div>
+                <ChevronRight className="w-5 h-5 text-[#71bcf0]" />
+              </a>
+
+              {/* Кнопка Выйти — в самом низу */}
               <button
                 onClick={() => onLogout && onLogout()}
                 className="w-full bg-white border border-red-200 rounded-2xl p-4 hover:shadow-md transition-all flex items-center justify-between hover:bg-red-50"
@@ -177,7 +193,18 @@ export function ProfilePage({
                   );
                 })}
                 
-                {/* Logout Button */}
+                {/* Powered by SLMTECH — выделено для заметности */}
+                <a
+                  href="https://www.instagram.com/slm_technology/?hl=ru"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full flex items-center gap-3 px-4 py-3.5 rounded-xl font-semibold text-sm transition-all hover:bg-[#71bcf0]/10 text-gray-900 mt-2 border-t border-[#71bcf0]/20 pt-2 bg-[#71bcf0]/5"
+                >
+                  <ExternalLink className="w-5 h-5 text-[#71bcf0]" />
+                  Powered by <span className="text-[#71bcf0] font-bold">SLMTECH</span>
+                </a>
+
+                {/* Кнопка Выйти — в самом низу */}
                 <button
                   onClick={() => onLogout && onLogout()}
                   className="w-full flex items-center gap-3 px-4 py-3.5 rounded-xl font-semibold text-sm transition-all hover:bg-red-50 text-red-600 mt-2 border-t border-gray-200 pt-2"

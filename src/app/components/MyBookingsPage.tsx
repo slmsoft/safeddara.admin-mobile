@@ -115,13 +115,13 @@ export function MyBookingsPage({ bookings, onBack, onWeatherClick, onLiveClick, 
       key={booking.id}
       className="group bg-white rounded-2xl overflow-hidden border border-slate-100 shadow-sm hover:shadow-md transition-shadow duration-200"
     >
-      <div className="flex">
-        {/* Room Image */}
-        <div className="w-28 h-32 flex-shrink-0 relative overflow-hidden">
+      <div className="flex items-stretch">
+        {/* Room Image — без лишнего места, растягивается по высоте карточки */}
+        <div className="w-24 lg:w-28 flex-shrink-0 relative overflow-hidden rounded-l-2xl">
           <img
             src={booking.roomImage}
             alt={booking.roomName}
-            className="w-full h-full object-cover transition-transform duration-200 group-hover:scale-105"
+            className="absolute inset-0 w-full h-full object-cover transition-transform duration-200 group-hover:scale-105"
           />
         </div>
 
