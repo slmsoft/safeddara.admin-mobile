@@ -1,6 +1,9 @@
-import { useState } from 'react';
-import { ChevronLeft, Calendar, Clock, MapPin, Users, CheckCircle2, XCircle } from 'lucide-react';
+import { useState, useRef } from 'react';
+import { ChevronLeft, Calendar, Clock, MapPin, Users, CheckCircle2, XCircle, RefreshCw } from 'lucide-react';
 import { ModernHeader } from './ModernHeader';
+
+const PULL_THRESHOLD = 70;
+const MAX_PULL = 100;
 
 export interface Booking {
   id: string;
@@ -11,7 +14,7 @@ export interface Booking {
   guests: number;
   nights: number;
   totalPrice: number;
-  status: 'active' | 'completed' | 'cancelled';
+  status: 'active' | 'completed' | 'cancelled' | 'pending';
   bookingDate: string;
 }
 
@@ -21,12 +24,39 @@ interface MyBookingsPageProps {
   onWeatherClick?: () => void;
   onLiveClick?: () => void;
   onBookingClick?: (booking: Booking) => void;
+  onRefresh?: () => void;
+  isLoading?: boolean;
 }
 
-export function MyBookingsPage({ bookings, onBack, onWeatherClick, onLiveClick, onBookingClick }: MyBookingsPageProps) {
+export function MyBookingsPage({ bookings, onBack, onWeatherClick, onLiveClick, onBookingClick, onRefresh, isLoading = false }: MyBookingsPageProps) {
   const [activeTab, setActiveTab] = useState<'active' | 'past'>('active');
+  const [pullOffset, setPullOffset] = useState(0);
+  const touchStartY = useRef(0);
+  const scrollRef = useRef<HTMLDivElement>(null);
 
-  const activeBookings = bookings.filter(b => b.status === 'active');
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStartY.current = e.touches[0].clientY;
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (!onRefresh || isLoading) return;
+    const scrollTop = scrollRef.current?.scrollTop ?? 0;
+    if (scrollTop > 0) return;
+    const deltaY = e.touches[0].clientY - touchStartY.current;
+    if (deltaY > 0) {
+      const offset = Math.min(deltaY * 0.5, MAX_PULL);
+      setPullOffset(offset);
+    }
+  };
+
+  const handleTouchEnd = () => {
+    if (pullOffset >= PULL_THRESHOLD && onRefresh) {
+      onRefresh();
+    }
+    setPullOffset(0);
+  };
+
+  const activeBookings = bookings.filter(b => b.status === 'active' || b.status === 'pending');
   const pastBookings = bookings.filter(b => b.status === 'completed' || b.status === 'cancelled');
 
   const formatDate = (dateString: string) => {
@@ -36,6 +66,13 @@ export function MyBookingsPage({ bookings, onBack, onWeatherClick, onLiveClick, 
 
   const getStatusBadge = (status: Booking['status']) => {
     switch (status) {
+      case 'pending':
+        return (
+          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-100 text-amber-700 text-xs font-medium">
+            <Clock className="w-3.5 h-3.5" />
+            Ожидает оплаты
+          </span>
+        );
       case 'active':
         return (
           <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-green-100 text-green-700 text-xs font-medium">
@@ -110,7 +147,7 @@ export function MyBookingsPage({ bookings, onBack, onWeatherClick, onLiveClick, 
             {booking.totalPrice} <span className="text-xs font-normal text-gray-500">смн</span>
           </p>
         </div>
-        {booking.status === 'active' && (
+        {(booking.status === 'active' || booking.status === 'pending') && (
           <button 
             onClick={() => onBookingClick?.(booking)}
             className="px-4 py-2 rounded-xl bg-[#71bcf0] text-white text-sm font-medium active:scale-95 transition-transform"
@@ -172,8 +209,35 @@ export function MyBookingsPage({ bookings, onBack, onWeatherClick, onLiveClick, 
           </button>
         </div>
 
-        {/* Bookings List */}
-        <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 delay-100">
+        {/* Bookings List — pull-to-refresh */}
+        <div
+          ref={scrollRef}
+          className="overflow-y-auto overscroll-contain animate-in fade-in slide-in-from-bottom-4 duration-500 delay-100"
+          style={{ touchAction: 'pan-y', minHeight: 300 }}
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
+        >
+          {onRefresh && (
+            <div
+              className="flex flex-col items-center justify-center overflow-hidden transition-all duration-200"
+              style={{
+                height: isLoading ? 56 : pullOffset,
+                opacity: pullOffset > 0 || isLoading ? 1 : 0,
+              }}
+            >
+              <div className="flex flex-col items-center gap-1 py-2">
+                <RefreshCw
+                  className={`w-6 h-6 text-[#71bcf0] transition-transform ${pullOffset >= PULL_THRESHOLD && !isLoading ? 'rotate-180' : ''} ${isLoading ? 'animate-spin' : ''}`}
+                  strokeWidth={2}
+                />
+                <span className="text-xs text-gray-500">
+                  {isLoading ? 'Обновление...' : pullOffset >= PULL_THRESHOLD ? 'Отпустите для обновления' : 'Потяните для обновления'}
+                </span>
+              </div>
+            </div>
+          )}
+          <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 delay-100">
           {activeTab === 'active' ? (
             activeBookings.length > 0 ? (
               <div className="space-y-3">
@@ -207,6 +271,7 @@ export function MyBookingsPage({ bookings, onBack, onWeatherClick, onLiveClick, 
               </div>
             )
           )}
+          </div>
         </div>
       </div>
 

@@ -49,6 +49,7 @@ import { InsurancePage } from './components/InsurancePage';
 import { AboutPage } from './components/AboutPage';
 import { AddressPage } from './components/AddressPage';
 import { PaymentWebViewPage } from './components/PaymentWebViewPage';
+import { PaymentReturnPage } from './components/PaymentReturnPage';
 import { EntertainmentPage } from './components/EntertainmentPage';
 import { ComingSoonPage } from './components/ComingSoonPage';
 import { WebHeader } from './components/WebHeader';
@@ -190,12 +191,54 @@ function AppContent() {
   const [showPurchaseHistory, setShowPurchaseHistory] = useState(false);
   const [showPaymentMethods, setShowPaymentMethods] = useState(false);
 
-  // Загружаем платежи только при открытии «История покупок» или «Мои билеты» — не при старте приложения
+  // Загружаем платежи только при открытии «Мои билеты». История покупок — только по pull-to-refresh (меньше нагрузка на сервер)
   useEffect(() => {
-    if ((showPurchaseHistory || showMyTickets) && isAuthenticated) {
+    if (showMyTickets && isAuthenticated) {
       loadPayments();
     }
-  }, [showPurchaseHistory, showMyTickets]);
+  }, [showMyTickets]);
+
+  // Загружаем бронирования отеля при открытии «Мои бронирования»
+  const loadBookings = async () => {
+    if (!isAuthenticated) return;
+    setBookingsLoading(true);
+    try {
+      const { backendApi } = await import('../api/backendApi');
+      const res = await backendApi.getBookings();
+      if (res.success && res.data?.bookings && Array.isArray(res.data.bookings)) {
+        const mapped: Booking[] = (res.data.bookings as any[]).map((b) => {
+          const acc = b.accommodation || {};
+          const statusMap: Record<string, Booking['status']> = {
+            pending: 'pending', pending_payment: 'pending', confirmed: 'active',
+            completed: 'completed', cancelled: 'cancelled',
+          };
+          return {
+            id: b.id,
+            roomName: acc.title || 'Номер',
+            roomImage: acc.images?.[0] || 'https://images.unsplash.com/photo-1566073771259-6a8506099945?w=800',
+            checkIn: typeof b.checkIn === 'string' ? b.checkIn.split('T')[0] : new Date(b.checkIn).toISOString().split('T')[0],
+            checkOut: typeof b.checkOut === 'string' ? b.checkOut.split('T')[0] : new Date(b.checkOut).toISOString().split('T')[0],
+            guests: b.guests ?? 1,
+            nights: b.nights ?? 1,
+            totalPrice: b.totalPrice ?? 0,
+            status: statusMap[b.status] ?? 'active',
+            bookingDate: b.createdAt ? new Date(b.createdAt).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+          };
+        });
+        setBookings(mapped);
+      }
+    } catch (err) {
+      console.error('Load bookings:', err);
+    } finally {
+      setBookingsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (showMyBookings && isAuthenticated) {
+      loadBookings();
+    }
+  }, [showMyBookings, isAuthenticated]);
   const [showAddCard, setShowAddCard] = useState(false);
   const [showFeedback, setShowFeedback] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
@@ -212,9 +255,11 @@ function AppContent() {
   const [showBookingDetails, setShowBookingDetails] = useState(false);
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
   const [showPaymentMethodModal, setShowPaymentMethodModal] = useState(false);
+  const [addCardFromPaymentModal, setAddCardFromPaymentModal] = useState(false);
   const [paymentUrl, setPaymentUrl] = useState<string | null>(null);
   const [showPaymentWebView, setShowPaymentWebView] = useState(false);
   const [paymentUrlLoading, setPaymentUrlLoading] = useState(false);
+  const [paymentSource, setPaymentSource] = useState<'products' | 'hotel'>('products');
   const [comingSoonSource, setComingSoonSource] = useState<NavPage>('home');
   const [openMapDirectly, setOpenMapDirectly] = useState(false);
   
@@ -222,6 +267,7 @@ function AppContent() {
   const [pendingOrderItems, setPendingOrderItems] = useState<CartItem[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [bookings, setBookings] = useState<Booking[]>([]);
+  const [bookingsLoading, setBookingsLoading] = useState(false);
   const [pendingHotelBooking, setPendingHotelBooking] = useState<BookingData | null>(null);
   
   // Initial category for tariffs page
@@ -290,6 +336,63 @@ function AppContent() {
     closeAllModals();
     setCurrentPage('home');
   };
+
+  // Слушаем postMessage от iframe с Commerzbank — после оплаты закрываем WebView и переходим в «Мои брони»
+  useEffect(() => {
+    const handler = (e: MessageEvent) => {
+      if (e.data?.type === 'payment_complete') {
+        setShowPaymentWebView(false);
+        setPaymentUrl(null);
+        setCurrentPage('profile');
+        if (paymentSource === 'hotel') {
+          setShowMyBookings(true);
+          import('../api/backendApi').then(({ backendApi }) => {
+            backendApi.getBookings().then((res) => {
+              if (res.success && res.data?.bookings) {
+                const mapped = (res.data.bookings as any[]).map((b: any) => ({
+                  id: b.id,
+                  roomName: b.accommodation?.title || '—',
+                  roomImage: b.accommodation?.images?.[0] || '',
+                  checkIn: b.checkIn ? new Date(b.checkIn).toISOString().split('T')[0] : '',
+                  checkOut: b.checkOut ? new Date(b.checkOut).toISOString().split('T')[0] : '',
+                  guests: b.guests || 0,
+                  nights: b.nights || 0,
+                  totalPrice: b.totalPrice || 0,
+                  status: (b.status === 'confirmed') ? 'active' : (b.status === 'cancelled') ? 'cancelled' : (b.status === 'pending_payment') ? 'pending' : 'active',
+                  bookingDate: b.createdAt ? new Date(b.createdAt).toISOString().split('T')[0] : '',
+                }));
+                setBookings(mapped);
+              }
+            }).catch(console.error);
+          });
+        } else {
+          setShowPurchaseHistory(true);
+        }
+        import('../api/payments').then(({ paymentsApi }) => {
+          paymentsApi.getAllPayments().then((payResponse) => {
+            if (payResponse.success && payResponse.data && typeof payResponse.data === 'object') {
+              const userPayments = (payResponse.data as any).userPayments;
+              if (Array.isArray(userPayments)) {
+                setOrders(userPayments.map((p: any) => {
+                  const rawId = p.orderId || p.id || `order-${Date.now()}`;
+                  return {
+                    id: rawId,
+                    orderNumber: formatTicketNumber(rawId),
+                    items: [{ id: '1', name: p.orderType || 'Услуга', categoryName: 'Услуга', price: p.totalPrice ?? p.totalAmount ?? 0, quantity: 1, date: p.date ? new Date(p.date).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '', image: '', description: '' }],
+                    total: p.totalPrice ?? p.totalAmount ?? 0,
+                    status: (p.status === 'payment_paid' || p.status === 'paid') ? 'paid' : p.status === 'canceled' ? 'cancelled' : 'pending',
+                    createdAt: p.date ? new Date(p.date).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : new Date().toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
+                  };
+                }));
+              }
+            }
+          }).catch(console.error);
+        });
+      }
+    };
+    window.addEventListener('message', handler);
+    return () => window.removeEventListener('message', handler);
+  }, [paymentSource]);
 
   // Toggle favorite hotel
   const handleToggleFavorite = (itemId: string, item: any) => {
@@ -510,6 +613,7 @@ function AppContent() {
         }
         setPaymentUrlLoading(false);
         if (url) {
+          setPaymentSource('products');
           setPaymentUrl(url);
           setShowPaymentWebView(true);
         } else {
@@ -559,13 +663,71 @@ function AppContent() {
     setShowPaymentMethodModal(false);
   };
 
-  // Complete hotel booking (локально, не в Swagger — оплата через API не предусмотрена)
-  const completeHotelBookingPayment = (booking?: BookingData | null) => {
-    const data = booking ?? pendingHotelBooking;
-    if (!data) return;
-    
+  // Hotel booking via backend-api — логика как Safeddara API: POST → poll payments → WebView
+  const createHotelBookingAndPay = async (cardId: number) => {
+    const data = currentBooking;
+    if (!data || !isAuthenticated) return;
+    if (!data.guestName || !data.guestEmail) throw new Error('Укажите имя и email гостя');
+
+    const { backendApi } = await import('../api/backendApi');
+    const res = await backendApi.createBooking({
+      accommodationId: data.room.id,
+      checkIn: data.checkIn.toISOString().split('T')[0],
+      checkOut: data.checkOut.toISOString().split('T')[0],
+      guests: data.guests,
+      guestName: data.guestName,
+      guestEmail: data.guestEmail,
+      cardId,
+    });
+
+    if (!res.success || !res.data) {
+      throw new Error((res as any).message || 'Ошибка бронирования');
+    }
+
+    let orderURL = res.data.orderURL ?? res.data.orderUrl ?? res.data.order_url;
+    const bookingId = res.data.booking?.id;
+
+    // Как Safeddara API: если orderURL нет в ответе — опрашиваем GET /payments/all
+    if (!orderURL || !orderURL.startsWith('http')) {
+      setPaymentUrlLoading(true);
+      try {
+        const pollInterval = 2000;
+        const maxAttempts = 20; // ~40 сек
+        let attempts = 0;
+        const pollForPaymentUrl = async (): Promise<string | null> => {
+          const payRes = await backendApi.getAllPayments();
+          if (payRes.success && payRes.data?.userPayments && Array.isArray(payRes.data.userPayments)) {
+            const match =
+              payRes.data.userPayments.find(
+                (p: any) =>
+                  (p.orderId === bookingId || p.orderId === (res.data?.booking as any)?.id) &&
+                  (p.orderURL || p.orderUrl)
+              ) || payRes.data.userPayments.find((p: any) => (p.orderURL || p.orderUrl)?.startsWith('http'));
+            const url = match?.orderURL ?? match?.orderUrl;
+            if (url && typeof url === 'string' && url.startsWith('http')) return url;
+          }
+          return null;
+        };
+        while (attempts < maxAttempts) {
+          orderURL = await pollForPaymentUrl();
+          if (orderURL) break;
+          await new Promise((r) => setTimeout(r, pollInterval));
+          attempts++;
+        }
+        if (!orderURL) {
+          console.error('[createHotelBookingAndPay] No orderURL after polling', res.data);
+          throw new Error(
+            (res.data as any)?.message ||
+              'Не удалось создать ссылку на оплату. Попробуйте другую карту или повторите позже.'
+          );
+        }
+      } finally {
+        setPaymentUrlLoading(false);
+      }
+    }
+
     const newBooking: Booking = {
-      id: `booking-${Date.now()}`,
+      id: bookingId || `booking-${Date.now()}`,
       roomName: data.room.name,
       roomImage: data.room.image,
       checkIn: data.checkIn.toISOString().split('T')[0],
@@ -573,31 +735,31 @@ function AppContent() {
       guests: data.guests,
       nights: data.nights,
       totalPrice: data.totalPrice,
-      status: 'active',
-      bookingDate: new Date().toISOString().split('T')[0]
+      status: 'pending',
+      bookingDate: new Date().toISOString().split('T')[0],
     };
-    
-    // Add booking to the list
     setBookings((prev) => [newBooking, ...prev]);
-    
-    // Clear states and navigate to My Bookings
-    setPendingHotelBooking(null);
+
     setShowHotelBookingConfirm(false);
     setShowPaymentMethodModal(false);
     setShowHotels(false);
     setCurrentBooking(null);
     setSelectedRoom(null);
-    setCurrentPage('profile');
-    setShowMyBookings(true);
+
+    setPaymentSource('hotel');
+    setPaymentUrl(orderURL);
+    setShowPaymentWebView(true);
   };
 
-  // Cancel order
-  const handleCancelOrder = (orderId: string) => {
-    setOrders((prev) =>
-      prev.map((order) =>
-        order.id === orderId ? { ...order, status: 'cancelled' as const } : order
-      )
-    );
+  // Open payment modal for hotel (select card → createHotelBookingAndPay)
+  const handleHotelConfirmPayment = async () => {
+    if (!isAuthenticated) {
+      setLoginFromMainApp(true);
+      setShowLogin(true);
+      return;
+    }
+    await loadSavedCardsFromApi();
+    setShowPaymentMethodModal(true);
   };
 
   // Show registration if not completed (intro removed)
@@ -605,9 +767,11 @@ function AppContent() {
   if (showLogin) {
     return (
       <LoginPage
+        message={currentBooking ? 'Войдите, чтобы продолжить оплату бронирования' : undefined}
         onBack={() => {
           setShowLogin(false);
           if (!loginFromMainApp) setShowRegistration(true);
+          setLoginFromMainApp(false);
         }}
         onSuccess={() => {
           setShowLogin(false);
@@ -705,7 +869,11 @@ function AppContent() {
               setShowPaymentWebView(false);
               setPaymentUrl(null);
               setCurrentPage('profile');
-              setShowPurchaseHistory(true);
+              if (paymentSource === 'hotel') {
+                setShowMyBookings(true);
+              } else {
+                setShowPurchaseHistory(true);
+              }
               try {
                 const { paymentsApi } = await import('../api/payments');
                 const payResponse = await paymentsApi.getAllPayments();
@@ -738,7 +906,30 @@ function AppContent() {
             isOpen={showPaymentMethodModal}
             onClose={handlePaymentModalClose}
             savedCards={savedCards}
-            onCreateOrder={createOrderAndProceed}
+            onCreateOrder={async (cardId: number) => {
+              try {
+                if (currentBooking) {
+                  await createHotelBookingAndPay(cardId);
+                } else {
+                  await createOrderAndProceed(cardId);
+                }
+              } catch (e: any) {
+                const msg = e?.message || 'Ошибка оплаты';
+                if (msg.includes('Сессия истекла') || msg.includes('авторизац')) {
+                  setShowPaymentMethodModal(false);
+                  // НЕ сбрасываем showHotelBookingConfirm и currentBooking — после входа вернёмся к оплате
+                  setLoginFromMainApp(true);
+                  setShowLogin(true);
+                  return;
+                }
+                throw e;
+              }
+            }}
+            onAddCard={() => {
+              setShowPaymentMethodModal(false);
+              setAddCardFromPaymentModal(true);
+              setShowAddCard(true);
+            }}
           />
         )}
 
@@ -776,9 +967,7 @@ function AppContent() {
                   setShowHotelBookingConfirm(false);
                   setShowHotelBooking(true);
                 }}
-                onConfirmBooking={() => {
-                  completeHotelBookingPayment(currentBooking);
-                }}
+                onConfirmBooking={handleHotelConfirmPayment}
                 onWeatherClick={() => setShowWeather(true)}
                 onLiveClick={() => setShowCameras(true)}
               />
@@ -793,9 +982,7 @@ function AppContent() {
                   setShowHotelBookingConfirm(false);
                   setShowHotelBooking(true);
                 }}
-                onConfirmBooking={() => {
-                  completeHotelBookingPayment(currentBooking);
-                }}
+                onConfirmBooking={handleHotelConfirmPayment}
                 onWeatherClick={() => setShowWeather(true)}
                 onLiveClick={() => setShowCameras(true)}
               />
@@ -880,6 +1067,8 @@ function AppContent() {
             }}
             onWeatherClick={() => setShowWeather(true)}
             onLiveClick={() => setShowCameras(true)}
+            onRefresh={loadBookings}
+            isLoading={bookingsLoading}
           />
         ) : showMyTickets ? (
           <MyTicketsPage
@@ -904,7 +1093,6 @@ function AppContent() {
                   setCurrentPage('profile');
                 }}
                 onPayOrder={undefined}
-                onCancelOrder={handleCancelOrder}
               />
             </div>
 
@@ -919,7 +1107,6 @@ function AppContent() {
                   setCurrentPage('profile');
                 }}
                 onPayOrder={undefined}
-                onCancelOrder={handleCancelOrder}
               />
             </div>
           </>
@@ -942,13 +1129,19 @@ function AppContent() {
           <AddCardPage
             onBack={() => {
               setShowAddCard(false);
-              setShowPaymentMethods(true);
+              if (addCardFromPaymentModal) {
+                setAddCardFromPaymentModal(false);
+                setShowPaymentMethodModal(true);
+              } else {
+                setShowPaymentMethods(true);
+              }
             }}
             onAddCard={handleAddCard}
             savedCards={savedCards}
             onNeedLogin={() => {
               setShowAddCard(false);
               setShowPaymentMethods(false);
+              setAddCardFromPaymentModal(false);
               setLoginFromMainApp(true);
               setShowLogin(true);
             }}
@@ -1442,17 +1635,13 @@ function AppContent() {
         <ModernBottomNav
           activeTab={currentPage}
           onTabChange={(tab) => {
-            setShowMyTickets(false);
-            setShowPurchaseHistory(false);
-            setShowPaymentMethods(false);
-            setShowAddCard(false);
-            setShowFavorites(false);
-            setShowSettings(false);
-            setShowFeedback(false);
-            setShowNotifications(false);
-            setShowMyBookings(false);
-            setShowBookingDetails(false);
+            closeAllModals();
             setCurrentPage(tab);
+            // Сброс начального состояния тарифов — иначе при переходе в «Услуги» может показываться пустой экран
+            if (tab === 'tariffs') {
+              setTariffsInitialCategory(undefined);
+              setTariffsInitialTariffId(undefined);
+            }
           }}
         />
       )}
@@ -1461,6 +1650,11 @@ function AppContent() {
 }
 
 export default function App() {
+  // Страница возврата после оплаты Commerzbank (в iframe)
+  if (typeof window !== 'undefined' && window.location.pathname === '/payment-return') {
+    return <PaymentReturnPage />;
+  }
+
   // Check URL for admin panel access - only via /admin path
   const [isAdminPanel, setIsAdminPanel] = useState(() => {
     if (typeof window === 'undefined') return false;
