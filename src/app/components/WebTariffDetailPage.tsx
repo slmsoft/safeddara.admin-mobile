@@ -138,16 +138,15 @@ export function WebTariffDetailPage({ tariff, onBack, onAddToCart, onGoToCart, c
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header with back button */}
+      {/* Header — только кнопка «Назад», название на изображении */}
       <div className="bg-white border-b border-gray-200">
-        <div className="max-w-[1400px] mx-auto px-8 py-4 flex items-center gap-4">
+        <div className="max-w-[1400px] mx-auto px-8 py-4 flex items-center">
           <button
             onClick={onBack}
             className="flex items-center justify-center hover:bg-gray-100 rounded-full p-2 transition-all"
           >
             <ChevronLeft className="w-6 h-6 text-gray-700" strokeWidth={2.5} />
           </button>
-          <h1 className="text-xl font-bold text-gray-900">{tariff.name}</h1>
         </div>
       </div>
 

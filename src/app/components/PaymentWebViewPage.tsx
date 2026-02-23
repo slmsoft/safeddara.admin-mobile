@@ -20,16 +20,23 @@ export function PaymentWebViewPage({ paymentUrl, onBack, onWeatherClick, onLiveC
 
       {/* Навигация < Оплата — снизу хедера, прикреплена */}
       <div className="flex-shrink-0 bg-white border-b border-gray-200 sticky top-[72px] z-30">
-        <div className="flex items-center justify-between px-4 py-3">
+        <div className="flex items-center justify-between px-4 py-3 gap-2">
           <button onClick={onBack} className="transition-all active:scale-95" type="button" aria-label="Назад">
             <ChevronLeft className="w-6 h-6 text-[#71bcf0]" />
           </button>
-          <h1 className="text-lg font-semibold text-gray-900">Оплата</h1>
-          <div className="w-10" />
+          <h1 className="text-lg font-semibold text-gray-900 flex-1 text-center">Оплата</h1>
+          <a
+            href={paymentUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-xs font-medium text-[#71bcf0] whitespace-nowrap"
+          >
+            Новая вкладка
+          </a>
         </div>
       </div>
 
-      {/* WebView — под навигацией. Скрываем верхний хедер страницы банка */}
+      {/* WebView — без sandbox: страница банка может не работать в sandbox-iframe */}
       <div className="flex-1 min-h-0 overflow-hidden">
         <iframe
           src={paymentUrl}
@@ -37,7 +44,6 @@ export function PaymentWebViewPage({ paymentUrl, onBack, onWeatherClick, onLiveC
           style={{ height: 'calc(100% + 80px)', marginTop: '-80px' }}
           title="Оплата"
           allow="payment"
-          sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-top-navigation"
         />
       </div>
 

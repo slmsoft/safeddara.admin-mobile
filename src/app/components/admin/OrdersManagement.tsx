@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Search, ShoppingCart, Package, CheckCircle, XCircle, Clock, Edit2, Trash2, Plus, Save, X } from 'lucide-react';
 import { Modal } from './Modal';
+import { adminApi } from '../../../api/backendApi';
 
 interface Order {
   id: string;
@@ -12,82 +13,79 @@ interface Order {
   date: string;
   status: 'completed' | 'processing' | 'cancelled';
   avatar: string;
+  dateSort?: string;
+}
+
+function mapSafeddaraStatus(s: string): 'completed' | 'processing' | 'cancelled' {
+  if (['confirmed', 'payment_paid'].includes(s)) return 'completed';
+  if (['canceled', 'payment_failed'].includes(s)) return 'cancelled';
+  return 'processing';
+}
+
+function formatOrderDate(d: string) {
+  try {
+    return new Date(d).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', year: 'numeric' });
+  } catch {
+    return d;
+  }
 }
 
 export function OrdersManagement() {
-  const [orders, setOrders] = useState<Order[]>([
-    {
-      id: '1',
-      customerName: 'Петр Васильев',
-      customerEmail: 'petr@mail.ru',
-      items: 'Лыжи горные, Шлем защитный',
-      quantity: 2,
-      total: 6000,
-      date: '12 янв 2026',
-      status: 'completed',
-      avatar: 'https://i.pravatar.cc/150?img=12'
-    },
-    {
-      id: '2',
-      customerName: 'Анна Иванова',
-      customerEmail: 'anna@gmail.com',
-      items: 'Подъемник (1 день)',
-      quantity: 1,
-      total: 8000,
-      date: '12 янв 2026',
-      status: 'processing',
-      avatar: 'https://i.pravatar.cc/150?img=45'
-    },
-    {
-      id: '3',
-      customerName: 'Сергей Смирнов',
-      customerEmail: 'sergey@inbox.ru',
-      items: 'Сноуборд, Шлем, Инструктор',
-      quantity: 3,
-      total: 20500,
-      date: '11 янв 2026',
-      status: 'completed',
-      avatar: 'https://i.pravatar.cc/150?img=33'
-    },
-    {
-      id: '4',
-      customerName: 'Ирина Петрова',
-      customerEmail: 'irina@yandex.ru',
-      items: 'Массаж спортивный',
-      quantity: 1,
-      total: 12000,
-      date: '11 янв 2026',
-      status: 'cancelled',
-      avatar: 'https://i.pravatar.cc/150?img=20'
-    },
-    {
-      id: '5',
-      customerName: 'Михаил Козлов',
-      customerEmail: 'mikhail@mail.com',
-      items: 'Фотосессия на склоне',
-      quantity: 1,
-      total: 20000,
-      date: '10 янв 2026',
-      status: 'completed',
-      avatar: 'https://i.pravatar.cc/150?img=56'
-    },
-    {
-      id: '6',
-      customerName: 'Ольга Морозова',
-      customerEmail: 'olga@gmail.com',
-      items: 'Парковка VIP, Подъемник',
-      quantity: 2,
-      total: 11000,
-      date: '10 янв 2026',
-      status: 'processing',
-      avatar: 'https://i.pravatar.cc/150?img=47'
-    }
-  ]);
-
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedStatus, setSelectedStatus] = useState('all');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingOrder, setEditingOrder] = useState<Order | null>(null);
+
+  const loadOrders = useCallback(async () => {
+    setLoading(true);
+    try {
+      const merged: Order[] = [];
+      const [safeddaraRes, bookingsRes] = await Promise.all([
+        adminApi.safeddara.orders().catch(() => ({ success: false, data: { orders: [] } })),
+        adminApi.bookings.list().catch(() => ({ success: false, data: { bookings: [] } })),
+      ]);
+      if (safeddaraRes.success && safeddaraRes.data?.orders) {
+        merged.push(...safeddaraRes.data.orders.map((o: any) => ({
+          id: `safeddara-${o.id}`,
+          customerName: o.customerName || '—',
+          customerEmail: o.customerEmail || '—',
+          items: o.orderType || 'Заказ',
+          quantity: 1,
+          total: 0,
+          date: formatOrderDate(o.createdAt || o.startDate),
+          dateSort: o.createdAt || o.startDate || '',
+          status: mapSafeddaraStatus(o.status || ''),
+          avatar: `https://i.pravatar.cc/150?u=${o.userId}`,
+        })));
+      }
+      if (bookingsRes.success && bookingsRes.data?.bookings) {
+        merged.push(...bookingsRes.data.bookings.map((b: any) => ({
+          id: `booking-${b.id}`,
+          customerName: b.guestName || '—',
+          customerEmail: b.guestEmail || '—',
+          items: b.accommodation?.title || 'Бронирование',
+          quantity: b.guests || 1,
+          total: b.totalPrice || 0,
+          date: formatOrderDate(b.checkIn || b.createdAt),
+          dateSort: b.checkIn || b.createdAt || '',
+          status: (b.status === 'confirmed' ? 'completed' : b.status === 'cancelled' ? 'cancelled' : 'processing') as Order['status'],
+          avatar: `https://i.pravatar.cc/150?u=${b.userId}`,
+        })));
+      }
+      merged.sort((a, b) => (b as any).dateSort.localeCompare((a as any).dateSort));
+      setOrders(merged);
+    } catch (e) {
+      console.error('Load orders:', e);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadOrders();
+  }, [loadOrders]);
 
   const filteredOrders = orders.filter(order => {
     const matchesSearch = order.customerName.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -162,6 +160,14 @@ export function OrdersManagement() {
     }
   };
 
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <div className="animate-spin w-10 h-10 border-2 border-blue-500 border-t-transparent rounded-full" />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Stats Cards */}
@@ -208,13 +214,6 @@ export function OrdersManagement() {
                 <option value="processing">Обработка</option>
                 <option value="cancelled">Отменено</option>
               </select>
-              <button
-                onClick={handleAddOrder}
-                className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-sm transition-colors flex items-center gap-2"
-              >
-                <Plus className="w-4 h-4" />
-                Добавить заказ
-              </button>
             </div>
           </div>
         </div>
@@ -229,7 +228,6 @@ export function OrdersManagement() {
                 <th className="text-left p-4 text-xs font-semibold text-gray-400 uppercase tracking-wider">Сумма</th>
                 <th className="text-left p-4 text-xs font-semibold text-gray-400 uppercase tracking-wider">Дата</th>
                 <th className="text-left p-4 text-xs font-semibold text-gray-400 uppercase tracking-wider">Статус</th>
-                <th className="text-right p-4 pr-6 text-xs font-semibold text-gray-400 uppercase tracking-wider">Действия</th>
               </tr>
             </thead>
             <tbody>

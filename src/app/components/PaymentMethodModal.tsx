@@ -14,25 +14,14 @@ interface SavedCardItem {
   cardType: string;
 }
 
-function CardIconSmall({ cardType }: { cardType: string }) {
-  const isVisa = /visa|vsa|^4/i.test(cardType);
-  const isMc = /master|mcr|^5/i.test(cardType);
+function CardIconSmall() {
   return (
-    <div
-      className={`w-12 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${
-        isVisa ? 'bg-gradient-to-br from-[#1A1F71] to-[#2D3A9F]' : isMc ? 'bg-gradient-to-br from-[#EB001B] to-[#F79E1B]' : 'bg-gray-800'
-      }`}
-    >
-      {isVisa ? (
-        <span className="text-white font-bold text-[9px] tracking-wider">VISA</span>
-      ) : isMc ? (
-        <div className="flex -space-x-1">
-          <div className="w-2.5 h-2.5 rounded-full bg-red-500" />
-          <div className="w-2.5 h-2.5 rounded-full bg-amber-400 opacity-90" />
-        </div>
-      ) : (
-        <span className="text-white/80 text-[7px] font-medium">MILLI</span>
-      )}
+    <div className="w-12 h-11 rounded-lg flex items-center justify-center flex-shrink-0 overflow-hidden bg-gray-100 self-center">
+      <img
+        src="/icons/credit-card.png"
+        alt=""
+        className="w-full h-full object-contain p-0.5"
+      />
     </div>
   );
 }
@@ -48,6 +37,7 @@ interface PaymentMethodModalProps {
   onClose: () => void;
   savedCards: Array<SavedCardItem>;
   onCreateOrder: (cardId: number) => Promise<void>;
+  onAddCard?: () => void;
 }
 
 export function PaymentMethodModal({
@@ -55,6 +45,7 @@ export function PaymentMethodModal({
   onClose,
   savedCards,
   onCreateOrder,
+  onAddCard,
 }: PaymentMethodModalProps) {
   const [showAddForm, setShowAddForm] = useState(false);
   const [cardNumber, setCardNumber] = useState('');
@@ -144,34 +135,44 @@ export function PaymentMethodModal({
     <>
       <div className="fixed inset-0 bg-black/50 z-50" onClick={onClose} />
       <div className="fixed bottom-0 left-0 right-0 lg:top-1/2 lg:left-1/2 lg:-translate-x-1/2 lg:-translate-y-1/2 lg:bottom-auto z-50 lg:w-full lg:max-w-md animate-slideUp lg:animate-fadeIn bg-white rounded-t-3xl lg:rounded-3xl px-6 py-6 shadow-2xl">
-        <h2 className="text-center text-base lg:text-lg font-semibold text-gray-900 mb-6">
+        <h2 className="text-center text-base lg:text-lg font-semibold text-gray-900 mb-4">
           Выберите способ оплаты
         </h2>
 
         {!showAddForm ? (
-          <div className="space-y-3 mb-4">
+          <div className="space-y-2 mb-4">
+            {error && (
+              <div className="p-3 bg-red-50 rounded-xl text-red-600 text-sm mb-2">{error}</div>
+            )}
             {savedCards.map((card) => (
               <button
                 key={card.id}
                 onClick={() => handleSelectCard(card.id)}
                 disabled={isLoading}
-                className="w-full flex items-center gap-4 p-4 rounded-xl bg-gray-50 hover:bg-gray-100 border border-gray-100 transition-all active:scale-[0.98] disabled:opacity-50 text-left"
+                className="w-full flex items-center gap-3 py-2.5 px-3 rounded-xl bg-gray-50 hover:bg-gray-100 border border-gray-100 transition-all active:scale-[0.98] disabled:opacity-50 text-left"
               >
-                <CardIconSmall cardType={card.cardType} />
+                <CardIconSmall />
                 <div className="flex-1 min-w-0">
-                  <p className="font-bold text-gray-900 text-sm">{getCardTypeLabel(card.cardType)}</p>
-                  <p className="text-gray-500 text-xs mt-0.5">•••• {card.cardNumber.slice(-4)}</p>
+                  <p className="font-semibold text-gray-900 text-[13px]">{getCardTypeLabel(card.cardType)}</p>
+                  <p className="text-gray-500 text-[11px] mt-0.5">•••• {card.cardNumber.slice(-4)}</p>
                 </div>
               </button>
             ))}
             <button
-              onClick={() => setShowAddForm(true)}
-              className="w-full flex items-center gap-4 p-4 rounded-xl border-2 border-dashed border-gray-300 hover:border-[#71bcf0] hover:bg-blue-50/30 transition-all"
+              onClick={() => {
+                if (onAddCard) {
+                  onClose();
+                  onAddCard();
+                } else {
+                  setShowAddForm(true);
+                }
+              }}
+              className="w-full flex items-center gap-3 py-2.5 px-3 rounded-xl border-2 border-dashed border-gray-300 hover:border-[#71bcf0] hover:bg-blue-50/30 transition-all"
             >
-              <div className="w-12 h-9 rounded-lg bg-gray-200 flex items-center justify-center flex-shrink-0">
-                <Plus className="w-5 h-5 text-gray-500" strokeWidth={2.5} />
+              <div className="w-10 h-8 rounded-lg bg-gray-200 flex items-center justify-center flex-shrink-0">
+                <Plus className="w-4 h-4 text-gray-500" strokeWidth={2.5} />
               </div>
-              <span className="font-medium text-gray-700">Добавить карту</span>
+              <span className="font-medium text-gray-700 text-[13px]">Добавить карту</span>
             </button>
           </div>
         ) : (

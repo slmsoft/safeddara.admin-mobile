@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { 
   Search, 
   Edit2,
@@ -12,6 +12,7 @@ import {
   X
 } from 'lucide-react';
 import { Modal } from './Modal';
+import { adminApi } from '../../../api/backendApi';
 
 interface User {
   id: string;
@@ -27,85 +28,41 @@ interface User {
 }
 
 export function UsersManagement() {
-  const [users, setUsers] = useState<User[]>([
-    {
-      id: '1',
-      name: 'John Carter',
-      email: 'john@google.com',
-      phone: '(414) 907 - 1574',
-      location: 'United States',
-      company: 'Google',
-      role: 'admin',
-      status: 'online',
-      avatar: 'https://i.pravatar.cc/150?img=12',
-      companyColor: 'bg-red-500'
-    },
-    {
-      id: '2',
-      name: 'Sophie Moore',
-      email: 'sophie@webflow.com',
-      phone: '(406) 480 - 4977',
-      location: 'United Kingdom',
-      company: 'Webflow',
-      role: 'user',
-      status: 'offline',
-      avatar: 'https://i.pravatar.cc/150?img=45',
-      companyColor: 'bg-blue-500'
-    },
-    {
-      id: '3',
-      name: 'Neil Crimson',
-      email: 'neil@facebook.com',
-      phone: '(318) 689 - 9589',
-      location: 'Australia',
-      company: 'Facebook',
-      role: 'accountant',
-      status: 'offline',
-      avatar: 'https://i.pravatar.cc/150?img=33',
-      companyColor: 'bg-blue-600'
-    },
-    {
-      id: '4',
-      name: 'Graham Hills',
-      email: 'graham@twitter.com',
-      phone: '(540) 627 - 3890',
-      location: 'India',
-      company: 'Twitter',
-      role: 'admin',
-      status: 'online',
-      avatar: 'https://i.pravatar.cc/150?img=56',
-      companyColor: 'bg-sky-500'
-    },
-    {
-      id: '5',
-      name: 'Sandy Houston',
-      email: 'sandy@youtube.com',
-      phone: '(440) 470 - 3848',
-      location: 'Canada',
-      company: 'YouTube',
-      role: 'user',
-      status: 'offline',
-      avatar: 'https://i.pravatar.cc/150?img=20',
-      companyColor: 'bg-red-600'
-    },
-    {
-      id: '6',
-      name: 'Andy Smith',
-      email: 'andy@reddit.com',
-      phone: '(504) 458 - 3268',
-      location: 'United States',
-      company: 'Reddit',
-      role: 'user',
-      status: 'online',
-      avatar: 'https://i.pravatar.cc/150?img=68',
-      companyColor: 'bg-orange-500'
-    }
-  ]);
-
+  const [users, setUsers] = useState<User[]>([]);
+  const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
+
+  const loadUsers = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await adminApi.safeddara.users();
+      if (res.success && res.data?.users) {
+        setUsers(res.data.users.map((u: any) => ({
+          id: u.id,
+          name: [u.firstName, u.lastName].filter(Boolean).join(' ') || '—',
+          email: u.email || '—',
+          phone: u.phone || '—',
+          location: '',
+          company: '',
+          role: 'user' as const,
+          status: 'offline' as const,
+          avatar: `https://i.pravatar.cc/150?u=${u.id}`,
+          companyColor: 'bg-gray-500'
+        })));
+      }
+    } catch (e) {
+      console.error('Load users:', e);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadUsers();
+  }, [loadUsers]);
 
   const filteredUsers = users.filter(user =>
     user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -270,6 +227,14 @@ export function UsersManagement() {
       color: 'bg-blue-500'
     }
   ];
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <div className="animate-spin w-10 h-10 border-2 border-blue-500 border-t-transparent rounded-full" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

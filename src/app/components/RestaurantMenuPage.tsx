@@ -1,6 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { ChevronLeft, Plus } from 'lucide-react';
 import { ModernHeader } from './ModernHeader';
+import { backendApi } from '../../api/backendApi';
+
+const DEFAULT_IMAGE = 'https://images.unsplash.com/photo-1716667283099-c239f254182e?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=400';
 
 interface MenuItem {
   id: string;
@@ -15,128 +18,41 @@ interface RestaurantMenuPageProps {
   onBack?: () => void;
   onWeatherClick?: () => void;
   onLiveClick?: () => void;
-  initialCategory?: string; // Добавляем поддержку начальной категории
+  initialCategory?: string;
 }
 
 export function RestaurantMenuPage({ onBack, onWeatherClick, onLiveClick, initialCategory }: RestaurantMenuPageProps) {
   const [selectedCategory, setSelectedCategory] = useState<string>(initialCategory || 'Все');
+  const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
+  const [categories, setCategories] = useState<{ id: string; title: string }[]>([{ id: 'all', title: 'Все' }]);
+  const [loading, setLoading] = useState(true);
 
-  const categories = ['Все', 'Завтрак', 'Обед', 'Ужин', 'Напитки', 'Десерты'];
-
-  const menuItems: MenuItem[] = [
-    {
-      id: '1',
-      name: 'Завтрак континентальный',
-      description: 'Яичница, тосты, джем, масло, кофе или чай',
-      price: 45,
-      image: 'https://images.unsplash.com/photo-1716667283099-c239f254182e?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=400',
-      category: 'Завтрак'
-    },
-    {
-      id: '2',
-      name: 'Омлет с овощами',
-      description: 'Свежие овощи, зелень, сыр',
-      price: 38,
-      image: 'https://images.unsplash.com/photo-1716667283099-c239f254182e?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=400',
-      category: 'Завтрак'
-    },
-    {
-      id: 'lagman',
-      name: 'Лагман',
-      description: 'Горячий лагман с дымком — согрейся вкусно после прогулки',
-      price: 60,
-      image: 'https://images.unsplash.com/photo-1669018560322-5f98298fd21d?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHx0cmFkaXRpb25hbCUyMHRhamlrJTIwZm9vZCUyMGxhZ21hbnxlbnwxfHx8fDE3Njc1MzE1NjN8MA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral',
-      category: 'Обед'
-    },
-    {
-      id: 'shashlik',
-      name: 'Шашлык',
-      description: 'Душанбинская классика — шашлык на углях с видом на горы',
-      price: 85,
-      image: 'https://images.unsplash.com/photo-1642497394080-b01ac324edc8?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxncmlsbGVkJTIwa2ViYWIlMjBzaGFzaGxpa3xlbnwxfHx8fDE3Njc1MzE1NjR8MA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral',
-      category: 'Обед'
-    },
-    {
-      id: '3',
-      name: 'Плов традиционный',
-      description: 'Баранина, морковь, рис, специи',
-      price: 65,
-      image: 'https://images.unsplash.com/photo-1723962807917-ffab0600929c?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=400',
-      category: 'Обед'
-    },
-    {
-      id: '4',
-      name: 'Шурпа',
-      description: 'Традиционный суп с бараниной и овощами',
-      price: 55,
-      image: 'https://images.unsplash.com/photo-1723962807917-ffab0600929c?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=400',
-      category: 'Обед'
-    },
-    {
-      id: '5',
-      name: 'Салат овощной',
-      description: 'Свежие помидоры, огурцы, зелень, оливковое масло',
-      price: 32,
-      image: 'https://images.unsplash.com/photo-1692780941266-96892bb6c9df?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=400',
-      category: 'Обед'
-    },
-    {
-      id: '6',
-      name: 'Стейк из говядины',
-      description: 'Премиум стейк с овощами гриль',
-      price: 125,
-      image: 'https://images.unsplash.com/photo-1555105269-2a294dddf6b6?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=400',
-      category: 'Ужин'
-    },
-    {
-      id: '7',
-      name: 'Рыба на гриле',
-      description: 'Форель с лимоном и зеленью',
-      price: 95,
-      image: 'https://images.unsplash.com/photo-1555105269-2a294dddf6b6?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=400',
-      category: 'Ужин'
-    },
-    {
-      id: '8',
-      name: 'Кофе эспрессо',
-      description: 'Классический итальянский кофе',
-      price: 15,
-      image: 'https://images.unsplash.com/photo-1618263616142-7b8815503d05?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=400',
-      category: 'Напитки'
-    },
-    {
-      id: '9',
-      name: 'Капучино',
-      description: 'Кофе с молочной пенкой',
-      price: 18,
-      image: 'https://images.unsplash.com/photo-1618263616142-7b8815503d05?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=400',
-      category: 'Напитки'
-    },
-    {
-      id: '10',
-      name: 'Зелёный чай',
-      description: 'Свежезаваренный зелёный чай',
-      price: 12,
-      image: 'https://images.unsplash.com/photo-1618263616142-7b8815503d05?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=400',
-      category: 'Напитки'
-    },
-    {
-      id: '11',
-      name: 'Тирамису',
-      description: 'Классический итальянский десерт',
-      price: 42,
-      image: 'https://images.unsplash.com/photo-1679942262057-d5732f732841?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=400',
-      category: 'Десерты'
-    },
-    {
-      id: '12',
-      name: 'Наполеон',
-      description: 'Слоёный торт с кремом',
-      price: 38,
-      image: 'https://images.unsplash.com/photo-1679942262057-d5732f732841?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=400',
-      category: 'Десерты'
-    }
-  ];
+  useEffect(() => {
+    backendApi.getRestaurantCategories()
+      .then((res) => {
+        if (res.success && res.data?.categories) {
+          const cats = res.data.categories;
+          const catList = [{ id: 'all', title: 'Все' }, ...cats.map((c) => ({ id: `cat-${c.id}`, title: c.title }))];
+          setCategories(catList);
+          const items: MenuItem[] = cats.flatMap((c) =>
+            c.items.map((i) => ({
+              id: i.id,
+              name: i.name,
+              description: i.name,
+              price: i.price,
+              image: i.image || DEFAULT_IMAGE,
+              category: c.title,
+            }))
+          );
+          setMenuItems(items);
+          if (initialCategory && catList.some((c) => c.title === initialCategory)) {
+            setSelectedCategory(initialCategory);
+          }
+        }
+      })
+      .catch((err) => console.warn('Restaurant load failed:', err))
+      .finally(() => setLoading(false));
+  }, [initialCategory]);
 
   const filteredItems = selectedCategory === 'Все' 
     ? menuItems 
@@ -166,20 +82,20 @@ export function RestaurantMenuPage({ onBack, onWeatherClick, onLiveClick, initia
           {/* Categories Filter */}
           <div className="pb-3 overflow-x-auto">
             <div className="flex gap-2">
-              {categories.map((category) => (
+              {categories.map((cat) => (
                 <button
-                  key={category}
-                  onClick={() => setSelectedCategory(category)}
+                  key={cat.id}
+                  onClick={() => setSelectedCategory(cat.title)}
                   className={`
                     px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap
                     transition-all duration-300
-                    ${selectedCategory === category
+                    ${selectedCategory === cat.title
                       ? 'bg-[#71bcf0] text-white shadow-lg'
                       : 'bg-white text-gray-600 border border-gray-200 hover:border-[#71bcf0]'
                     }
                   `}
                 >
-                  {category}
+                  {cat.title}
                 </button>
               ))}
             </div>
@@ -187,6 +103,11 @@ export function RestaurantMenuPage({ onBack, onWeatherClick, onLiveClick, initia
         </div>
 
         {/* Menu Items - Grid layout */}
+        {loading ? (
+          <div className="flex justify-center py-16">
+            <div className="animate-spin w-10 h-10 border-2 border-[#71bcf0] border-t-transparent rounded-full" />
+          </div>
+        ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-4 pb-6">
           {filteredItems.map((item, index) => (
             <div
@@ -220,6 +141,7 @@ export function RestaurantMenuPage({ onBack, onWeatherClick, onLiveClick, initia
             </div>
           ))}
         </div>
+        )}
       </div>
 
       <style>{`

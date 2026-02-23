@@ -120,13 +120,7 @@ export function AdminApp() {
       users: {
         title: 'Пользователи',
         subtitle: 'Управление пользователями и их правами доступа.',
-        action: { 
-          label: 'Добавить пользователя', 
-          onClick: () => {
-            const handler = (window as any).__usersAddHandler;
-            if (handler) handler();
-          }
-        }
+        action: { label: 'Добавить пользователя', onClick: () => { const h = (window as any).__usersAddHandler; if (h) h(); } }
       },
       hotels: {
         title: 'Гостиницы и номера',
@@ -169,28 +163,6 @@ export function AdminApp() {
           }
         }
       },
-      events: {
-        title: 'События',
-        subtitle: 'Управление предстоящими событиями и мероприятиями.',
-        action: { 
-          label: 'Создать событие', 
-          onClick: () => {
-            const handler = (window as any).__eventsAddHandler;
-            if (handler) handler();
-          }
-        }
-      },
-      cameras: {
-        title: 'Камеры LIVE',
-        subtitle: 'Мониторинг и управление видеотрансляциями.',
-        action: { 
-          label: 'Добавить камеру', 
-          onClick: () => {
-            const handler = (window as any).__camerasAddHandler;
-            if (handler) handler();
-          }
-        }
-      },
       restaurant: {
         title: 'Ресторан',
         subtitle: 'Управление меню и заказами ресторана.',
@@ -202,33 +174,25 @@ export function AdminApp() {
           }
         }
       },
-      orders: {
-        title: 'Заказы',
-        subtitle: 'Просмотр всех заказов услуг и оборудования.'
+      events: {
+        title: 'События',
+        subtitle: 'Управление предстоящими событиями и мероприятиями.',
+        action: { label: 'Создать событие', onClick: () => { const h = (window as any).__eventsAddHandler; if (h) h(); } }
       },
-      feedback: {
-        title: 'Отзывы',
-        subtitle: 'Обратная связь от гостей курорта.'
+      cameras: {
+        title: 'Камеры LIVE',
+        subtitle: 'Мониторинг и управление видеотрансляциями.',
+        action: { label: 'Добавить камеру', onClick: () => { const h = (window as any).__camerasAddHandler; if (h) h(); } }
       },
+      orders: { title: 'Заказы', subtitle: 'Просмотр всех заказов услуг и оборудования.' },
+      feedback: { title: 'Отзывы', subtitle: 'Обратная связь от гостей курорта.' },
       rules: {
         title: 'Правила FIS',
         subtitle: 'Управление правилами безопасности на склонах.',
-        action: { 
-          label: 'Добавить правило', 
-          onClick: () => {
-            const handler = (window as any).__rulesAddHandler;
-            if (handler) handler();
-          }
-        }
+        action: { label: 'Добавить правило', onClick: () => { const h = (window as any).__rulesAddHandler; if (h) h(); } }
       },
-      about: {
-        title: 'О Сафеддаре',
-        subtitle: 'Информация о курорте и его истории.'
-      },
-      settings: {
-        title: 'Настройки',
-        subtitle: 'Системные настройки и конфигурация.'
-      }
+      about: { title: 'О Сафеддаре', subtitle: 'Информация о курорте и его истории.' },
+      settings: { title: 'Настройки', subtitle: 'Системные настройки и конфигурация.' }
     };
     return configs[currentPage] || {};
   };

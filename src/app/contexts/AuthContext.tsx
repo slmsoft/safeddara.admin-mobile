@@ -9,6 +9,8 @@ interface AuthContextType {
   login: (password: string) => Promise<void>;
   logout: () => void;
   refreshSession: () => Promise<void>;
+  /** Синхронизировать состояние из localStorage (после регистрации и т.п.) */
+  syncAuthState: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -94,12 +96,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  // Check session on mount (use isAuthenticated to respect expiration)
-  useEffect(() => {
+  const syncAuthState = () => {
     setAuthState(prev => ({
       ...prev,
       isAuthenticated: isAuthenticated(),
     }));
+  };
+
+  // Check session on mount (use isAuthenticated to respect expiration)
+  useEffect(() => {
+    syncAuthState();
   }, []);
 
   return (
@@ -110,6 +116,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         login,
         logout,
         refreshSession,
+        syncAuthState,
       }}
     >
       {children}

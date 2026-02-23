@@ -35,96 +35,21 @@ interface MenuItem {
 }
 
 const menuItems: MenuItem[] = [
-  { 
-    id: 'dashboard', 
-    label: 'Главная', 
-    icon: LayoutDashboard, 
-    roles: ['superadmin', 'admin', 'accountant']
-  },
-  { 
-    id: 'users', 
-    label: 'Пользователи', 
-    icon: Users, 
-    roles: ['superadmin', 'admin']
-  },
-  { 
-    id: 'hotels', 
-    label: 'Гостиницы', 
-    icon: Hotel, 
-    roles: ['superadmin', 'admin']
-  },
-  { 
-    id: 'bookings', 
-    label: 'Бронирования', 
-    icon: Calendar, 
-    roles: ['superadmin', 'admin', 'accountant']
-  },
-  { 
-    id: 'services', 
-    label: 'Услуги', 
-    icon: Briefcase, 
-    roles: ['superadmin', 'admin']
-  },
-  { 
-    id: 'restaurant', 
-    label: 'Ресторан', 
-    icon: UtensilsCrossed, 
-    roles: ['superadmin', 'admin']
-  },
-  { 
-    id: 'news', 
-    label: 'Новости', 
-    icon: Newspaper, 
-    roles: ['superadmin', 'admin']
-  },
-  { 
-    id: 'events', 
-    label: 'События', 
-    icon: CalendarDays, 
-    roles: ['superadmin', 'admin']
-  },
-  { 
-    id: 'orders', 
-    label: 'Заказы', 
-    icon: ShoppingCart, 
-    roles: ['superadmin', 'admin', 'accountant']
-  },
-  { 
-    id: 'transactions', 
-    label: 'Транзакции', 
-    icon: CreditCard, 
-    roles: ['superadmin', 'accountant']
-  },
-  { 
-    id: 'feedback', 
-    label: 'Отзывы', 
-    icon: MessageSquare, 
-    roles: ['superadmin', 'admin']
-  },
-  { 
-    id: 'cameras', 
-    label: 'Камеры LIVE', 
-    icon: Camera, 
-    roles: ['superadmin', 'admin']
-  },
-  { 
-    id: 'rules', 
-    label: 'Правила FIS', 
-    icon: FileText, 
-    roles: ['superadmin', 'admin']
-  },
-  { 
-    id: 'about', 
-    label: 'О Сафеддаре', 
-    icon: Info, 
-    roles: ['superadmin', 'admin']
-  },
-  { 
-    id: 'settings', 
-    label: 'Настройки', 
-    icon: Settings, 
-    roles: ['superadmin']
-  }
+  { id: 'dashboard', label: 'Главная', icon: LayoutDashboard, roles: ['superadmin', 'admin', 'accountant'] },
+  { id: 'users', label: 'Пользователи', icon: Users, roles: ['superadmin', 'admin'] },
+  { id: 'hotels', label: 'Гостиницы', icon: Hotel, roles: ['superadmin', 'admin'] },
+  { id: 'bookings', label: 'Бронирования', icon: Calendar, roles: ['superadmin', 'admin', 'accountant'] },
+  { id: 'services', label: 'Услуги', icon: Briefcase, roles: ['superadmin', 'admin'] },
+  { id: 'restaurant', label: 'Ресторан', icon: UtensilsCrossed, roles: ['superadmin', 'admin'] },
+  { id: 'news', label: 'Новости', icon: Newspaper, roles: ['superadmin', 'admin'] },
+  { id: 'events', label: 'События', icon: CalendarDays, roles: ['superadmin', 'admin'] },
+  { id: 'orders', label: 'Заказы', icon: ShoppingCart, roles: ['superadmin', 'admin', 'accountant'] },
+  { id: 'transactions', label: 'Транзакции', icon: CreditCard, roles: ['superadmin', 'accountant'] },
+  { id: 'feedback', label: 'Отзывы', icon: MessageSquare, roles: ['superadmin', 'admin'] },
+  { id: 'cameras', label: 'Камеры LIVE', icon: Camera, roles: ['superadmin', 'admin'] },
+  { id: 'rules', label: 'Правила FIS', icon: FileText, roles: ['superadmin', 'admin'] },
+  { id: 'about', label: 'О Сафеддаре', icon: Info, roles: ['superadmin', 'admin'] },
+  { id: 'settings', label: 'Настройки', icon: Settings, roles: ['superadmin'] }
 ];
 
 export function AdminSidebar({ currentPage, onNavigate, userRole, username }: AdminSidebarProps) {

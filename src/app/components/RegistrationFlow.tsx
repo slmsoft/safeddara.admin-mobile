@@ -5,6 +5,7 @@ import { Step2 } from './registration/Step2';
 import { Step2OTP } from './registration/Step2OTP';
 import { usersApi } from '../../api/users';
 import { getDeviceToken, saveAuth } from '../../api/auth';
+import { useAuth } from '../contexts/AuthContext';
 
 interface RegistrationFlowProps {
   onComplete: () => void;
@@ -12,6 +13,7 @@ interface RegistrationFlowProps {
 }
 
 export function RegistrationFlow({ onComplete, onSwitchToLogin }: RegistrationFlowProps) {
+  const { syncAuthState } = useAuth();
   const [step, setStep] = useState(1);
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
@@ -150,6 +152,7 @@ export function RegistrationFlow({ onComplete, onSwitchToLogin }: RegistrationFl
             }
           }
           saveAuth(sessionId, expiresAt);
+          syncAuthState(); // Обновить AuthContext, чтобы isAuthenticated стал true
         }
 
         // Сохраняем данные регистрации
@@ -167,14 +170,12 @@ export function RegistrationFlow({ onComplete, onSwitchToLogin }: RegistrationFl
       }
     } catch (error: any) {
       console.error('Registration error:', error);
-      // Extract detailed error message
       let errorMsg = 'Неизвестная ошибка';
-      if (error.message) {
-        errorMsg = error.message;
-      } else if (error.success === false && error.message) {
-        errorMsg = error.message;
-      } else if (typeof error === 'string') {
-        errorMsg = error;
+      const raw = error?.message || (error?.success === false && error?.message) || (typeof error === 'string' ? error : '');
+      if (/duplicate|23505|unique constraint|ski_client_id/i.test(String(raw))) {
+        errorMsg = 'Этот номер уже зарегистрирован. Войдите в аккаунт.';
+      } else if (raw) {
+        errorMsg = raw;
       }
       alert('Ошибка регистрации: ' + errorMsg);
     }

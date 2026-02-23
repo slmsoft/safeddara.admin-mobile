@@ -33,6 +33,8 @@ export interface BookingData {
   guests: number;
   nights: number;
   totalPrice: number;
+  guestName: string;
+  guestEmail: string;
 }
 
 export function HotelBookingPage({ room, onBack, onContinue, onWeatherClick, onLiveClick }: HotelBookingPageProps) {
@@ -41,6 +43,7 @@ export function HotelBookingPage({ room, onBack, onContinue, onWeatherClick, onL
   const [guests, setGuests] = useState(1);
   const [isSelectingCheckIn, setIsSelectingCheckIn] = useState(true);
   const [guestName, setGuestName] = useState('');
+  const [guestEmail, setGuestEmail] = useState('');
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -62,7 +65,7 @@ export function HotelBookingPage({ room, onBack, onContinue, onWeatherClick, onL
   };
 
   const handleContinue = () => {
-    if (checkIn && checkOut && guests > 0) {
+    if (checkIn && checkOut && guests > 0 && guestName.trim() && guestEmail.trim()) {
       onContinue({
         room: {
           id: room.id,
@@ -74,12 +77,14 @@ export function HotelBookingPage({ room, onBack, onContinue, onWeatherClick, onL
         checkOut,
         guests,
         nights,
-        totalPrice
+        totalPrice,
+        guestName: guestName.trim(),
+        guestEmail: guestEmail.trim()
       });
     }
   };
 
-  const canContinue = checkIn && checkOut && guests > 0;
+  const canContinue = checkIn && checkOut && guests > 0 && guestName.trim().length > 0 && guestEmail.trim().length > 0;
 
   // Gallery images for the room
   const roomImages = [
@@ -341,7 +346,7 @@ export function HotelBookingPage({ room, onBack, onContinue, onWeatherClick, onL
               </div>
 
               {/* Guest Name Input */}
-              <div>
+              <div className="mb-4">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Имя гостя
                 </label>
@@ -350,6 +355,19 @@ export function HotelBookingPage({ room, onBack, onContinue, onWeatherClick, onL
                   value={guestName}
                   onChange={(e) => setGuestName(e.target.value)}
                   placeholder="Введите ваше имя"
+                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#71bcf0] focus:border-transparent transition-all"
+                />
+              </div>
+              {/* Guest Email Input */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Email
+                </label>
+                <input
+                  type="email"
+                  value={guestEmail}
+                  onChange={(e) => setGuestEmail(e.target.value)}
+                  placeholder="example@mail.com"
                   className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#71bcf0] focus:border-transparent transition-all"
                 />
               </div>

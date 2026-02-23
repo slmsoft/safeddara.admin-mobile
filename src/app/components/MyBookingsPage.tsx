@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react';
-import { ChevronLeft, Calendar, Clock, MapPin, Users, CheckCircle2, XCircle, RefreshCw } from 'lucide-react';
+import { ChevronLeft, Calendar, Clock, Users, CheckCircle2, XCircle, RefreshCw, ChevronRight } from 'lucide-react';
 import { ModernHeader } from './ModernHeader';
 
 const PULL_THRESHOLD = 70;
@@ -11,6 +11,8 @@ export interface Booking {
   roomImage: string;
   checkIn: string;
   checkOut: string;
+  checkInFull?: string;
+  checkOutFull?: string;
   guests: number;
   nights: number;
   totalPrice: number;
@@ -64,33 +66,44 @@ export function MyBookingsPage({ bookings, onBack, onWeatherClick, onLiveClick, 
     return date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', year: 'numeric' });
   };
 
+  const formatDateShort = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' });
+  };
+
+  const formatDateTime = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+  };
+
   const getStatusBadge = (status: Booking['status']) => {
+    const base = 'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium';
     switch (status) {
       case 'pending':
         return (
-          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-100 text-amber-700 text-xs font-medium">
-            <Clock className="w-3.5 h-3.5" />
+          <span className={`${base} bg-amber-50 text-amber-700 border border-amber-200/60`}>
+            <Clock className="w-3.5 h-3.5 flex-shrink-0" />
             Ожидает оплаты
           </span>
         );
       case 'active':
         return (
-          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-green-100 text-green-700 text-xs font-medium">
-            <CheckCircle2 className="w-3.5 h-3.5" />
+          <span className={`${base} bg-emerald-50 text-emerald-700 border border-emerald-200/60`}>
+            <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0" />
             Активно
           </span>
         );
       case 'completed':
         return (
-          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-blue-100 text-blue-700 text-xs font-medium">
-            <CheckCircle2 className="w-3.5 h-3.5" />
+          <span className={`${base} bg-sky-50 text-sky-700 border border-sky-200/60`}>
+            <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0" />
             Завершено
           </span>
         );
       case 'cancelled':
         return (
-          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-gray-100 text-gray-700 text-xs font-medium">
-            <XCircle className="w-3.5 h-3.5" />
+          <span className={`${base} bg-slate-100 text-slate-600 border border-slate-200/60`}>
+            <XCircle className="w-3.5 h-3.5 flex-shrink-0" />
             Отменено
           </span>
         );
@@ -98,122 +111,118 @@ export function MyBookingsPage({ bookings, onBack, onWeatherClick, onLiveClick, 
   };
 
   const renderBookingCard = (booking: Booking) => (
-    <div key={booking.id} className="bg-white rounded-2xl shadow-sm overflow-hidden mb-3">
-      <div className="flex gap-3 p-3">
+    <div
+      key={booking.id}
+      className="group bg-white rounded-2xl overflow-hidden border border-slate-100 shadow-sm hover:shadow-md transition-shadow duration-200"
+    >
+      <div className="flex">
         {/* Room Image */}
-        <div className="w-24 h-24 flex-shrink-0">
+        <div className="w-28 h-32 flex-shrink-0 relative overflow-hidden">
           <img
             src={booking.roomImage}
             alt={booking.roomName}
-            className="w-full h-full rounded-xl object-cover"
+            className="w-full h-full object-cover transition-transform duration-200 group-hover:scale-105"
           />
         </div>
 
         {/* Booking Info */}
-        <div className="flex-1 min-w-0">
-          <div className="flex items-start justify-between mb-1.5">
-            <h3 className="font-semibold text-gray-900 text-sm line-clamp-1">
+        <div className="flex-1 min-w-0 p-4 flex flex-col justify-between">
+          <div>
+            <h3 className="font-semibold text-slate-900 text-[15px] leading-tight line-clamp-2 mb-2">
               {booking.roomName}
             </h3>
             {getStatusBadge(booking.status)}
           </div>
 
-          <div className="space-y-1.5">
-            <div className="flex items-center gap-1.5 text-xs text-gray-600">
-              <Calendar className="w-3.5 h-3.5 flex-shrink-0" />
-              <span className="truncate">
-                {formatDate(booking.checkIn)} - {formatDate(booking.checkOut)}
+          <div className="space-y-1.5 mt-2">
+            <div className="flex items-center gap-2 text-xs text-slate-500">
+              <Calendar className="w-3.5 h-3.5 flex-shrink-0 text-slate-400" />
+              <span>
+                {booking.checkInFull && booking.checkOutFull
+                  ? `${formatDateTime(booking.checkInFull)} – ${formatDateTime(booking.checkOutFull)}`
+                  : `${formatDateShort(booking.checkIn)} – ${formatDateShort(booking.checkOut)}`}
               </span>
             </div>
-
-            <div className="flex items-center gap-1.5 text-xs text-gray-600">
-              <Clock className="w-3.5 h-3.5 flex-shrink-0" />
-              <span>{booking.nights} ночей</span>
-            </div>
-
-            <div className="flex items-center gap-1.5 text-xs text-gray-600">
-              <Users className="w-3.5 h-3.5 flex-shrink-0" />
-              <span>{booking.guests} гостей</span>
+            <div className="flex items-center gap-2 text-xs text-slate-500">
+              <Clock className="w-3.5 h-3.5 flex-shrink-0 text-slate-400" />
+              <span>{booking.nights} {booking.nights === 1 ? 'ночь' : booking.nights < 5 ? 'ночи' : 'ночей'}</span>
+              <span className="text-slate-300">•</span>
+              <Users className="w-3.5 h-3.5 flex-shrink-0 text-slate-400" />
+              <span>{booking.guests} {booking.guests === 1 ? 'гость' : 'гостей'}</span>
             </div>
           </div>
-        </div>
-      </div>
 
-      {/* Price & Action */}
-      <div className="border-t border-gray-100 px-3 py-2.5 flex items-center justify-between">
-        <div className="flex-shrink-0 text-right">
-          <p className="text-xs text-gray-500 mb-0.5">Общая сумма</p>
-          <p className="font-bold text-[#71bcf0]">
-            {booking.totalPrice} <span className="text-xs font-normal text-gray-500">смн</span>
-          </p>
+          <div className="flex items-center justify-between mt-3 pt-3 border-t border-slate-100">
+            <p className="text-sm font-bold text-[#4a90b8]">Сумма: {booking.totalPrice} <span className="text-slate-500 font-normal">смн</span></p>
+            {(booking.status === 'active' || booking.status === 'pending') && (
+              <button
+                onClick={() => onBookingClick?.(booking)}
+                className="flex items-center gap-1 px-3 py-2 rounded-xl bg-gradient-to-r from-[#5ba8e0] to-[#71bcf0] text-white text-sm font-medium shadow-sm hover:shadow active:scale-[0.98] transition-all"
+              >
+                Детали
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            )}
+            {booking.status === 'completed' && (
+              <span className="px-3 py-2 rounded-xl bg-slate-100 text-slate-600 text-sm font-medium">Повторить</span>
+            )}
+          </div>
         </div>
-        {(booking.status === 'active' || booking.status === 'pending') && (
-          <button 
-            onClick={() => onBookingClick?.(booking)}
-            className="px-4 py-2 rounded-xl bg-[#71bcf0] text-white text-sm font-medium active:scale-95 transition-transform"
-          >
-            Детали
-          </button>
-        )}
-        {booking.status === 'completed' && (
-          <button className="px-4 py-2 rounded-xl bg-gray-100 text-gray-700 text-sm font-medium active:scale-95 transition-transform">
-            Повторить
-          </button>
-        )}
       </div>
     </div>
   );
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
+    <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100/50">
       <ModernHeader onWeatherClick={onWeatherClick} onLiveClick={onLiveClick} />
 
-      {/* Back Button Header */}
-      <div className="bg-white border-b border-gray-200 sticky top-[72px] z-30">
-        <div className="flex items-center justify-between px-4 py-3">
+      {/* Page Header */}
+      <div className="bg-white/80 backdrop-blur-sm border-b border-slate-200/80 sticky top-[72px] z-30">
+        <div className="max-w-[420px] mx-auto flex items-center justify-between px-4 py-3">
           <button
-            onClick={() => onBack && onBack()}
-            className="transition-all active:scale-95"
+            onClick={() => onBack?.()}
+            className="flex items-center justify-center w-10 h-10 -ml-1 rounded-full hover:bg-slate-100 active:scale-95 transition-all"
             type="button"
+            aria-label="Назад"
           >
-            <ChevronLeft className="w-6 h-6 text-[#71bcf0]" />
+            <ChevronLeft className="w-6 h-6 text-[#5ba8e0]" strokeWidth={2.5} />
           </button>
-          <h1 className="text-lg font-semibold text-gray-900">Мои брони</h1>
+          <h1 className="text-lg font-semibold text-slate-800">Мои брони</h1>
           <div className="w-10" />
+        </div>
+
+        {/* Tabs */}
+        <div className="max-w-[420px] mx-auto px-4 pb-3">
+          <div className="flex rounded-xl bg-slate-100/80 p-1">
+            <button
+              onClick={() => setActiveTab('active')}
+              className={`flex-1 py-2.5 px-4 rounded-lg text-sm font-medium transition-all duration-200 ${
+                activeTab === 'active'
+                  ? 'bg-white text-slate-800 shadow-sm'
+                  : 'text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              Активные
+            </button>
+            <button
+              onClick={() => setActiveTab('past')}
+              className={`flex-1 py-2.5 px-4 rounded-lg text-sm font-medium transition-all duration-200 ${
+                activeTab === 'past'
+                  ? 'bg-white text-slate-800 shadow-sm'
+                  : 'text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              История
+            </button>
+          </div>
         </div>
       </div>
 
-      <div className="max-w-[402px] mx-auto px-4 pt-4 pb-6">
-        {/* Tabs - Segmented Control */}
-        <div className="bg-gray-100 rounded-full p-1 flex gap-1 mb-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
-          <button
-            onClick={() => setActiveTab('active')}
-            className={`flex-1 py-2.5 px-4 rounded-full text-sm font-semibold transition-all ${
-              activeTab === 'active'
-                ? 'bg-[#71bcf0] text-white shadow-sm'
-                : 'bg-transparent text-gray-600'
-            }`}
-          >
-            Активные
-          </button>
-          <button
-            onClick={() => setActiveTab('past')}
-            className={`flex-1 py-2.5 px-4 rounded-full text-sm font-semibold transition-all ${
-              activeTab === 'past'
-                ? 'bg-[#71bcf0] text-white shadow-sm'
-                : 'bg-transparent text-gray-600'
-            }`}
-          >
-            История
-          </button>
-        </div>
-
-        {/* Bookings List — pull-to-refresh */}
+      <div className="max-w-[420px] mx-auto px-4 py-5 pb-28">
         <div
           ref={scrollRef}
-          className="overflow-y-auto overscroll-contain animate-in fade-in slide-in-from-bottom-4 duration-500 delay-100"
-          style={{ touchAction: 'pan-y', minHeight: 300 }}
+          className="overflow-y-auto overscroll-contain"
+          style={{ height: 'calc(100vh - 220px)', touchAction: 'pan-y', minHeight: 200 }}
           onTouchStart={handleTouchStart}
           onTouchMove={handleTouchMove}
           onTouchEnd={handleTouchEnd}
@@ -226,68 +235,53 @@ export function MyBookingsPage({ bookings, onBack, onWeatherClick, onLiveClick, 
                 opacity: pullOffset > 0 || isLoading ? 1 : 0,
               }}
             >
-              <div className="flex flex-col items-center gap-1 py-2">
+              <div className="flex flex-col items-center gap-1.5 py-2">
                 <RefreshCw
-                  className={`w-6 h-6 text-[#71bcf0] transition-transform ${pullOffset >= PULL_THRESHOLD && !isLoading ? 'rotate-180' : ''} ${isLoading ? 'animate-spin' : ''}`}
+                  className={`w-6 h-6 text-[#5ba8e0] transition-transform ${pullOffset >= PULL_THRESHOLD && !isLoading ? 'rotate-180' : ''} ${isLoading ? 'animate-spin' : ''}`}
                   strokeWidth={2}
                 />
-                <span className="text-xs text-gray-500">
-                  {isLoading ? 'Обновление...' : pullOffset >= PULL_THRESHOLD ? 'Отпустите для обновления' : 'Потяните для обновления'}
+                <span className="text-xs text-slate-500">
+                  {isLoading ? 'Обновление...' : pullOffset >= PULL_THRESHOLD ? 'Отпустите' : 'Потяните вниз'}
                 </span>
               </div>
             </div>
           )}
-          <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 delay-100">
+
           {activeTab === 'active' ? (
             activeBookings.length > 0 ? (
-              <div className="space-y-3">
+              <div className="space-y-4">
                 {activeBookings.map(renderBookingCard)}
               </div>
             ) : (
-              <div className="bg-white rounded-2xl shadow-sm p-8 text-center">
-                <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
-                  <Calendar className="w-8 h-8 text-gray-400" />
+              <div className="bg-white rounded-2xl border border-slate-100 p-10 text-center shadow-sm">
+                <div className="w-20 h-20 mx-auto mb-5 rounded-2xl bg-gradient-to-br from-slate-100 to-slate-50 flex items-center justify-center">
+                  <Calendar className="w-10 h-10 text-slate-400" strokeWidth={1.5} />
                 </div>
-                <h3 className="font-semibold text-gray-900 mb-2">Нет активных броней</h3>
-                <p className="text-sm text-gray-600">
-                  У вас пока нет активных бронирований
+                <h3 className="text-lg font-semibold text-slate-800 mb-2">Нет активных броней</h3>
+                <p className="text-sm text-slate-500 leading-relaxed max-w-[240px] mx-auto">
+                  Забронируйте жильё в горах — оно появится здесь
                 </p>
               </div>
             )
           ) : (
             pastBookings.length > 0 ? (
-              <div className="space-y-3">
+              <div className="space-y-4">
                 {pastBookings.map(renderBookingCard)}
               </div>
             ) : (
-              <div className="bg-white rounded-2xl shadow-sm p-8 text-center">
-                <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
-                  <Clock className="w-8 h-8 text-gray-400" />
+              <div className="bg-white rounded-2xl border border-slate-100 p-10 text-center shadow-sm">
+                <div className="w-20 h-20 mx-auto mb-5 rounded-2xl bg-gradient-to-br from-slate-100 to-slate-50 flex items-center justify-center">
+                  <Clock className="w-10 h-10 text-slate-400" strokeWidth={1.5} />
                 </div>
-                <h3 className="font-semibold text-gray-900 mb-2">Нет прошлых броней</h3>
-                <p className="text-sm text-gray-600">
-                  История ваших бронирований появится здесь
+                <h3 className="text-lg font-semibold text-slate-800 mb-2">История пуста</h3>
+                <p className="text-sm text-slate-500 leading-relaxed max-w-[240px] mx-auto">
+                  Завершённые бронирования появятся здесь
                 </p>
               </div>
             )
           )}
-          </div>
         </div>
       </div>
-
-      <style>{`
-        @keyframes fade-in {
-          from { opacity: 0; }
-          to { opacity: 1; }
-        }
-        @keyframes slide-in-from-bottom-4 {
-          from { transform: translateY(16px); opacity: 0; }
-          to { transform: translateY(0); opacity: 1; }
-        }
-        .animate-in {
-          animation-fill-mode: both;
-        }
-      `}</style>
     </div>
   );
 }

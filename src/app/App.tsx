@@ -204,6 +204,8 @@ function AppContent() {
     setBookingsLoading(true);
     try {
       const { backendApi } = await import('../api/backendApi');
+      // Как safeddara-api: сначала GET /payments/all (CheckPaymentStatus, обновление статусов)
+      await backendApi.getAllPayments();
       const res = await backendApi.getBookings();
       if (res.success && res.data?.bookings && Array.isArray(res.data.bookings)) {
         const mapped: Booking[] = (res.data.bookings as any[]).map((b) => {
@@ -212,12 +214,16 @@ function AppContent() {
             pending: 'pending', pending_payment: 'pending', confirmed: 'active',
             completed: 'completed', cancelled: 'cancelled',
           };
+          const checkInRaw = typeof b.checkIn === 'string' ? b.checkIn : new Date(b.checkIn).toISOString();
+          const checkOutRaw = typeof b.checkOut === 'string' ? b.checkOut : new Date(b.checkOut).toISOString();
           return {
             id: b.id,
             roomName: acc.title || 'Номер',
             roomImage: acc.images?.[0] || 'https://images.unsplash.com/photo-1566073771259-6a8506099945?w=800',
-            checkIn: typeof b.checkIn === 'string' ? b.checkIn.split('T')[0] : new Date(b.checkIn).toISOString().split('T')[0],
-            checkOut: typeof b.checkOut === 'string' ? b.checkOut.split('T')[0] : new Date(b.checkOut).toISOString().split('T')[0],
+            checkIn: checkInRaw.split('T')[0],
+            checkOut: checkOutRaw.split('T')[0],
+            checkInFull: checkInRaw,
+            checkOutFull: checkOutRaw,
             guests: b.guests ?? 1,
             nights: b.nights ?? 1,
             totalPrice: b.totalPrice ?? 0,
@@ -347,20 +353,28 @@ function AppContent() {
         if (paymentSource === 'hotel') {
           setShowMyBookings(true);
           import('../api/backendApi').then(({ backendApi }) => {
-            backendApi.getBookings().then((res) => {
+            backendApi.getAllPayments().then(() =>
+              backendApi.getBookings()
+            ).then((res) => {
               if (res.success && res.data?.bookings) {
-                const mapped = (res.data.bookings as any[]).map((b: any) => ({
+                const mapped = (res.data.bookings as any[]).map((b: any) => {
+                  const checkInRaw = b.checkIn ? (typeof b.checkIn === 'string' ? b.checkIn : new Date(b.checkIn).toISOString()) : '';
+                  const checkOutRaw = b.checkOut ? (typeof b.checkOut === 'string' ? b.checkOut : new Date(b.checkOut).toISOString()) : '';
+                  return {
                   id: b.id,
                   roomName: b.accommodation?.title || '—',
                   roomImage: b.accommodation?.images?.[0] || '',
-                  checkIn: b.checkIn ? new Date(b.checkIn).toISOString().split('T')[0] : '',
-                  checkOut: b.checkOut ? new Date(b.checkOut).toISOString().split('T')[0] : '',
+                  checkIn: checkInRaw ? checkInRaw.split('T')[0] : '',
+                  checkOut: checkOutRaw ? checkOutRaw.split('T')[0] : '',
+                  checkInFull: checkInRaw || undefined,
+                  checkOutFull: checkOutRaw || undefined,
                   guests: b.guests || 0,
                   nights: b.nights || 0,
                   totalPrice: b.totalPrice || 0,
                   status: (b.status === 'confirmed') ? 'active' : (b.status === 'cancelled') ? 'cancelled' : (b.status === 'pending_payment') ? 'pending' : 'active',
                   bookingDate: b.createdAt ? new Date(b.createdAt).toISOString().split('T')[0] : '',
-                }));
+                };
+                });
                 setBookings(mapped);
               }
             }).catch(console.error);
@@ -1637,7 +1651,6 @@ function AppContent() {
           onTabChange={(tab) => {
             closeAllModals();
             setCurrentPage(tab);
-            // Сброс начального состояния тарифов — иначе при переходе в «Услуги» может показываться пустой экран
             if (tab === 'tariffs') {
               setTariffsInitialCategory(undefined);
               setTariffsInitialTariffId(undefined);

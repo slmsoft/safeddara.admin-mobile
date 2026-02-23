@@ -76,4 +76,12 @@ export const usersApi = {
   async verifyDeviceToken(token: string): Promise<ApiResponse> {
     return apiClient.get(`/users/verify/device-token?device-token=${encodeURIComponent(token)}`, false);
   },
+
+  /**
+   * List users (admin) — из БД safeddara-api
+   * GET /admin/users
+   */
+  async listAdmin(): Promise<ApiResponse<{ users: Array<{ id: string; firstName: string; lastName: string; phone: string; email: string; createdAt: string }> }>> {
+    return apiClient.get('/admin/users', false);
+  },
 };

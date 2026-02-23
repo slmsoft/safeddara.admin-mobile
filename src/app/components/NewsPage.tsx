@@ -1,5 +1,6 @@
 import { ChevronLeft } from 'lucide-react';
 import { useState, useEffect } from 'react';
+import { backendApi } from '../../api/backendApi';
 
 interface NewsItem {
   id: string;
@@ -9,91 +10,52 @@ interface NewsItem {
   content: string;
 }
 
+const DEFAULT_IMAGE = 'https://images.unsplash.com/photo-1551698618-1dfe5d97d256?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=800';
+
+function apiToNewsItem(n: { id: string; title: string; content: string; image?: string | null; publishedAt?: string | null }): NewsItem {
+  const d = n.publishedAt ? new Date(n.publishedAt) : new Date();
+  return {
+    id: n.id,
+    date: d.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' }),
+    title: n.title,
+    image: n.image || DEFAULT_IMAGE,
+    content: n.content || '',
+  };
+}
+
 interface NewsPageProps {
   onBack?: () => void;
-  initialNewsId?: string; // Добавляем поддержку начальной новости
+  initialNewsId?: string;
 }
 
 export function NewsPage({ onBack, initialNewsId }: NewsPageProps) {
   const [selectedNews, setSelectedNews] = useState<NewsItem | null>(null);
+  const [newsItems, setNewsItems] = useState<NewsItem[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const newsItems: NewsItem[] = [
-    {
-      id: '1',
-      date: '29.12.2025',
-      title: 'Ведущие курорты Евразийского континента...',
-      image: 'https://images.unsplash.com/photo-1551698618-1dfe5d97d256?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=800',
-      content: `В зимнем сезоне 2025–2026 владельцы сезонных ски-пассов смогут кататься сразу в нескольких крупных горных курортах Казахстана, Узбекистана, Азербайджана и России.
-
-Shymbulak совместно с курортами-участниками Евразийского Альянса Горных Курортов (ЕАГК) объявляет о запуске акции «Горнолыжный сезон без границ», которая будет действовать в зимнем сезоне 2025 – 2026 годов.
-
-Теперь владельцы сезонного ски-пасса, приобретённого на курортах Shymbulak или Oi-Qaragai в Казахстане, Amirsoy в Узбекистане, Shahdag в Азербайджане или Rosa Khutor в России смогут получить бесплатный ски-пасс сроком до пяти дней на каждом из курортов-партнёров. Условие участия в акции - проживание в отелях курорта-партнёра либо в рекомендованных им местах размещения.
-
-Акция «Горнолыжный сезон без границ» стала практическим шагом в развитии идеи Межгосударственного горного туристического маршрута.`
-    },
-    {
-      id: '2',
-      date: '29.12.2025',
-      title: 'Shymbulak напомнил о правилах безопасно...',
-      image: 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=800',
-      content: `Курорт Shymbulak напоминает всем гостям о важности соблюдения правил безопасности на склонах.
-
-Перед началом катания необходимо ознакомиться с картой склонов, уровнями сложности трасс и правилами поведения. Обязательно используйте защитное снаряжение: шлем, защиту для спины и суставов.
-
-Следите за погодными условиями и предупреждениями администрации курорта. Не выходите за пределы обозначенных трасс и не катайтесь в состоянии алкогольного опьянения.
-
-Инструкторы курорта всегда готовы помочь начинающим лыжникам и сноубордистам освоить базовые навыки безопасного катания.
-
-Помните: ваша безопасность - наш приоритет!`
-    },
-    {
-      id: '3',
-      date: '29.12.2025',
-      title: 'Режим работы курорта в новогодние празд...',
-      image: 'https://images.unsplash.com/photo-1605540436563-5bca919ae766?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=800',
-      content: `Уважаемые гости! Информируем вас о режиме работы курорта Shymbulak в период новогодних праздников.
-
-31 декабря 2025 года:
-Подъёмники работают с 9:00 до 16:00
-Рестораны и кафе - до 18:00
-
-1 января 2026 года:
-Подъёмники работают с 10:00 до 17:00
-Специальная новогодняя программа для гостей
-
-2-8 января 2026 года:
-Обычный режим работы с 9:00 до 17:00
-
-В новогоднюю ночь на территории курорта пройдёт праздничная программа с фейерверком, живой музыкой и развлечениями для всей семьи.
-
-Бронирование столиков в ресторанах доступно по телефону +7 (727) 330 93 00.
-
-С наступающим Новым годом!`
-    },
-    {
-      id: '4',
-      date: '28.12.2025',
-      title: 'Открытие новой трассы для фрирайда',
-      image: 'https://images.unsplash.com/photo-1551524164-687a55dd1126?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=800',
-      content: `Курорт Shymbulak рад объявить об открытии новой трассы для любителей фрирайда!
-
-Новая зона расположена на высоте 3200 метров и предлагает уникальные возможности для катания по целине. Протяжённость маршрута - 2.5 км с перепадом высот 600 метров.
-
-Доступ к трассе осуществляется через подъёмник "Талгар". Обязательно наличие лавинного снаряжения и сопровождение гида.
-
-Курорт организует групповые туры с профессиональными инструкторами каждую субботу и воскресенье. Запись по телефону горнолыжной школы.`
-    }
-  ];
-
-  // Автоматически открываем выбранную новость при загрузке
   useEffect(() => {
-    if (initialNewsId) {
-      const news = newsItems.find(item => item.id === initialNewsId);
-      if (news) {
-        setSelectedNews(news);
-      }
+    backendApi.getNews()
+      .then((res) => {
+        if (res.success && res.data?.news) {
+          setNewsItems(res.data.news.map(apiToNewsItem));
+        }
+      })
+      .catch((err) => console.warn('News load failed:', err))
+      .finally(() => setLoading(false));
+  }, []);
+
+  useEffect(() => {
+    if (!initialNewsId || newsItems.length === 0) return;
+    const news = newsItems.find((item) => item.id === initialNewsId);
+    if (news) setSelectedNews(news);
+    else {
+      backendApi.getNewsItem(initialNewsId)
+        .then((res) => {
+          if (res.success && res.data?.news) setSelectedNews(apiToNewsItem(res.data.news));
+        })
+        .catch(() => {});
     }
-  }, [initialNewsId]);
+  }, [initialNewsId, newsItems]);
 
   if (selectedNews) {
     return <NewsDetailPage news={selectedNews} onBack={() => setSelectedNews(null)} />;
@@ -136,6 +98,11 @@ Shymbulak совместно с курортами-участниками Евр
       {/* News Grid - Mobile: 1 column, Desktop: 4 columns */}
       <div className="max-w-[402px] lg:max-w-[1400px] mx-auto">
         <div className="px-4 lg:px-8 pt-6 lg:pt-8 pb-6">
+          {loading ? (
+            <div className="flex justify-center py-16">
+              <div className="animate-spin w-10 h-10 border-2 border-[#71bcf0] border-t-transparent rounded-full" />
+            </div>
+          ) : (
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-5 lg:gap-6">
             {newsItems.map((news, index) => (
               <NewsCard
@@ -146,6 +113,7 @@ Shymbulak совместно с курортами-участниками Евр
               />
             ))}
           </div>
+          )}
         </div>
       </div>
     </div>

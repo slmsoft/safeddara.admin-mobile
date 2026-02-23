@@ -11,7 +11,7 @@ interface BookingDetailsPageProps {
     guests: number;
     nights: number;
     totalPrice: number;
-    status: 'active' | 'completed' | 'cancelled';
+    status: 'active' | 'completed' | 'cancelled' | 'pending';
     bookingDate: string;
   };
   onBack: () => void;
@@ -32,6 +32,12 @@ export function BookingDetailsPage({ booking, onBack, onWeatherClick, onLiveClic
 
   const getStatusBadge = () => {
     switch (booking.status) {
+      case 'pending':
+        return (
+          <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-amber-100">
+            <span className="text-sm font-medium text-amber-700">Ожидает оплаты</span>
+          </div>
+        );
       case 'active':
         return (
           <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-green-100">

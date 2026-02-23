@@ -10,9 +10,10 @@ import { SafeddaraLogo } from './registration/SafeddaraLogo';
 interface LoginPageProps {
   onBack?: () => void;
   onSuccess?: () => void;
+  message?: string;
 }
 
-export function LoginPage({ onBack, onSuccess }: LoginPageProps) {
+export function LoginPage({ onBack, onSuccess, message }: LoginPageProps) {
   const { login } = useAuth();
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -77,7 +78,7 @@ export function LoginPage({ onBack, onSuccess }: LoginPageProps) {
             <div className="flex items-center justify-center gap-2 mb-8">
               <div className="h-[1px] w-8 bg-white/40"></div>
               <p className="text-center text-white/70 text-sm">
-                Введите пароль для входа в аккаунт
+                {message || 'Введите пароль для входа в аккаунт'}
               </p>
               <div className="h-[1px] w-8 bg-white/40"></div>
             </div>

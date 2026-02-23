@@ -1,35 +1,8 @@
+import { useState, useEffect } from 'react';
 import { ChevronRight } from 'lucide-react';
+import { backendApi } from '../../api/backendApi';
 
-const restaurants = [
-  {
-    id: 1,
-    image: 'https://images.unsplash.com/photo-1669018560322-5f98298fd21d?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHx0cmFkaXRpb25hbCUyMHRhamlrJTIwZm9vZCUyMGxhZ21hbnxlbnwxfHx8fDE3Njc1MzE1NjN8MA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral',
-    title: 'Горячий лагман с дымком — согрейся вкусно после прогулки',
-    price: 60,
-    category: 'Обед',
-  },
-  {
-    id: 2,
-    image: 'https://images.unsplash.com/photo-1642497394080-b01ac324edc8?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxncmlsbGVkJTIwa2ViYWIlMjBzaGFzaGxpa3xlbnwxfHx8fDE3Njc1MzE1NjR8MA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral',
-    title: 'Душанбинская классика — шашлык на углях с видом на горы',
-    price: 85,
-    category: 'Обед',
-  },
-  {
-    id: 3,
-    image: 'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=1080',
-    title: 'Сочная пицца с сыром и овощами',
-    price: 120,
-    category: 'Основное',
-  },
-  {
-    id: 4,
-    image: 'https://images.unsplash.com/photo-1504674900247-0877df9cc836?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=1080',
-    title: 'Традиционный плов по-душанбински',
-    price: 75,
-    category: 'Обед',
-  },
-];
+const DEFAULT_IMAGE = 'https://images.unsplash.com/photo-1669018560322-5f98298fd21d?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=1080';
 
 interface RestaurantSectionProps {
   onViewMenu?: () => void;
@@ -37,6 +10,27 @@ interface RestaurantSectionProps {
 }
 
 export function RestaurantSection({ onViewMenu, onCardClick }: RestaurantSectionProps) {
+  const [restaurants, setRestaurants] = useState<Array<{ id: string; image: string; title: string; price: number; category: string }>>([]);
+
+  useEffect(() => {
+    backendApi.getRestaurantCategories()
+      .then((res) => {
+        if (res.success && res.data?.categories) {
+          const items = res.data.categories.flatMap((c) =>
+            c.items.map((i) => ({
+              id: i.id,
+              image: i.image || DEFAULT_IMAGE,
+              title: i.name,
+              price: i.price,
+              category: c.title,
+            }))
+          );
+          setRestaurants(items.slice(0, 4));
+        }
+      })
+      .catch(() => {});
+  }, []);
+
   return (
     <section className="mt-16 px-1 sm:px-2 lg:px-0">
       {/* Section header */}

@@ -4,8 +4,19 @@ import { ModernHeader } from './ModernHeader';
 import { usePageScroll } from '../hooks/usePageScroll';
 import { ImageWithFallback } from './figma/ImageWithFallback';
 import { FavoriteIcon } from './ProfileIcons';
+import { backendApi, type Accommodation } from '../../api/backendApi';
 import cottageImage from '../../assets/67efe2a08cddf9fa1b091ced4088929ef5af6c58.png';
 import hotelRoomImage from '../../assets/25c317e42bf5f261055669edb14cc195cf786636.png';
+
+function accommodationToItem(a: Accommodation): AccommodationItem {
+  return {
+    id: a.id,
+    title: a.title,
+    capacity: a.capacity,
+    price: a.pricePerNight,
+    images: a.images?.length ? a.images : [cottageImage],
+  };
+}
 
 interface HotelsPageProps {
   onWeatherClick?: () => void;
@@ -31,7 +42,26 @@ export function HotelsPage({ onWeatherClick, onLiveClick, onBack, onRoomSelect, 
   const [activeTab, setActiveTab] = useState<TabType>(initialTab);
   const [currentImageIndex, setCurrentImageIndex] = useState<{ [key: string]: number }>({});
   const [hoveredItemId, setHoveredItemId] = useState<string | null>(null);
+  const [apiAccommodations, setApiAccommodations] = useState<AccommodationItem[] | null>(null);
+  const [apiByType, setApiByType] = useState<{ cottage: AccommodationItem[]; safedara_room: AccommodationItem[]; hotel_room: AccommodationItem[] } | null>(null);
   const { containerRef } = usePageScroll('hotels-page');
+
+  useEffect(() => {
+    backendApi.getAccommodations()
+      .then((res) => {
+        if (res.success && res.data?.accommodations) {
+          const items = res.data.accommodations.map(accommodationToItem);
+          setApiAccommodations(items);
+          const byType = {
+            cottage: res.data.accommodations.filter((a) => a.type === 'cottage').map(accommodationToItem),
+            safedara_room: res.data.accommodations.filter((a) => a.type === 'safedara_room').map(accommodationToItem),
+            hotel_room: res.data.accommodations.filter((a) => a.type === 'hotel_room').map(accommodationToItem),
+          };
+          setApiByType(byType);
+        }
+      })
+      .catch((err) => console.warn('Backend accommodations load failed:', err));
+  }, []);
 
   const cottages: AccommodationItem[] = [
     {
@@ -186,6 +216,21 @@ export function HotelsPage({ onWeatherClick, onLiveClick, onBack, onRoomSelect, 
   ];
 
   const getCurrentItems = (): AccommodationItem[] => {
+    const fromApi = apiByType && (apiAccommodations?.length ?? 0) > 0;
+    if (fromApi && apiByType) {
+      switch (activeTab) {
+        case 'all':
+          return apiAccommodations ?? [];
+        case 'cottages':
+          return apiByType.cottage;
+        case 'safedara':
+          return apiByType.safedara_room;
+        case 'hotel':
+          return apiByType.hotel_room;
+        default:
+          return apiAccommodations ?? [];
+      }
+    }
     switch (activeTab) {
       case 'all':
         return [...cottages, ...safedaraRooms, ...hotelRooms];

@@ -19,4 +19,12 @@ export const ordersApi = {
   async getBarcode(orderId: string): Promise<Response> {
     return apiClient.getRaw(`/orders/${encodeURIComponent(orderId)}/barcode`, true);
   },
+
+  /**
+   * POST /orders/{id}/cancel
+   * Cancel order by id
+   */
+  async cancelOrder(orderId: string): Promise<ApiResponse<null>> {
+    return apiClient.post<null>(`/orders/${encodeURIComponent(orderId)}/cancel`, {}, true);
+  },
 };

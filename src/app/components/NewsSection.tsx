@@ -1,28 +1,8 @@
+import { useState, useEffect } from 'react';
 import { ChevronRight } from 'lucide-react';
+import { backendApi } from '../../api/backendApi';
 
-const news = [
-  {
-    id: '1',
-    image: 'https://images.unsplash.com/photo-1551698618-1dfe5d97d256?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=800',
-    title: 'Ведущие курорты Евразийского континента объединились для развития зимнего туризма',
-    featured: true,
-  },
-  {
-    id: '2',
-    image: 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=800',
-    title: 'Сафеддара напомнил о правилах безопасности на склонах',
-  },
-  {
-    id: '3',
-    image: 'https://images.unsplash.com/photo-1605540436563-5bca919ae766?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=800',
-    title: 'Режим работы курорта в новогодние праздники',
-  },
-  {
-    id: '4',
-    image: 'https://images.unsplash.com/photo-1483664852095-d6cc6870702d?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=800',
-    title: 'Открытие нового ресторана с панорамным видом',
-  },
-];
+const DEFAULT_IMAGE = 'https://images.unsplash.com/photo-1551698618-1dfe5d97d256?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=800';
 
 interface NewsSectionProps {
   onNewsClick?: () => void;
@@ -30,6 +10,22 @@ interface NewsSectionProps {
 }
 
 export function NewsSection({ onNewsClick, onCardClick }: NewsSectionProps) {
+  const [news, setNews] = useState<Array<{ id: string; image: string; title: string }>>([]);
+
+  useEffect(() => {
+    backendApi.getNews(4, 0)
+      .then((res) => {
+        if (res.success && res.data?.news) {
+          setNews(res.data.news.slice(0, 4).map((n) => ({
+            id: n.id,
+            image: n.image || DEFAULT_IMAGE,
+            title: n.title,
+          })));
+        }
+      })
+      .catch(() => {});
+  }, []);
+
   return (
     <section className="mt-16 px-1 sm:px-2 lg:px-0">
       {/* Section header */}

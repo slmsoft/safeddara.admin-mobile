@@ -144,16 +144,15 @@ export function TariffDetailPage({ tariff, onBack, onAddToCart, onGoToCart, cart
 
   return (
     <div className="min-h-screen bg-gray-50 pb-24">
-      {/* Header */}
-      <div className="bg-white px-5 py-4 flex items-center gap-3 sticky top-0 z-40 shadow-sm">
+      {/* Header — только кнопка «Назад», название на изображении */}
+      <div className="bg-white px-5 py-4 flex items-center sticky top-0 z-40 shadow-sm">
         <button
           onClick={() => onBack && onBack()}
-          className="transition-all active:scale-95 z-10"
+          className="transition-all active:scale-95"
           type="button"
         >
           <ChevronLeft className="w-6 h-6 text-[#71bcf0]" strokeWidth={2.5} />
         </button>
-        <h1 className="absolute left-0 right-0 text-center text-base font-semibold text-gray-900 pointer-events-none">{tariff.name}</h1>
       </div>
 
       {/* Hero Section with Image */}
