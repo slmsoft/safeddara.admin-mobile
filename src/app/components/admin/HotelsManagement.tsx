@@ -196,7 +196,7 @@ export function HotelsManagement() {
   };
 
   const removeBlockedDate = async (blockId: string) => {
-    if (!confirm('Удалить блокировку?')) return;
+    if (!confirm('Удалить бронирование?')) return;
     try {
       await adminApi.accommodations.blockedDates.delete(blockId);
       setBlockedDates(blockedDates.filter(b => b.id !== blockId));
@@ -286,7 +286,7 @@ export function HotelsManagement() {
                 <button onClick={() => handleView(hotel)} className="flex-1 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/30 text-blue-400 text-xs py-2 rounded-lg flex items-center justify-center gap-1">
                   <Eye className="w-3 h-3" /> Просмотр
                 </button>
-                <button onClick={() => openBlockedDates(hotel)} className="bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-400 p-2 rounded-lg" title="Заблокировать даты">
+                <button onClick={() => openBlockedDates(hotel)} className="bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-400 p-2 rounded-lg" title="Бронирование дат">
                   <CalendarX className="w-3 h-3" />
                 </button>
                 <button onClick={() => handleEdit(hotel)} className="bg-[#0d1117] hover:bg-[#1e2537] border border-[#1e2537] text-gray-400 p-2 rounded-lg">
@@ -402,7 +402,7 @@ export function HotelsManagement() {
         )}
       </Modal>
 
-      <Modal isOpen={blockedDatesModalOpen} onClose={() => setBlockedDatesModalOpen(false)} title={blockedDatesHotel ? `Заблокированные даты: ${blockedDatesHotel.name}` : 'Заблокированные даты'} size="lg">
+      <Modal isOpen={blockedDatesModalOpen} onClose={() => setBlockedDatesModalOpen(false)} title={blockedDatesHotel ? `Бронирование дат: ${blockedDatesHotel.name}` : 'Бронирование дат'} size="lg">
         {blockedDatesHotel && (
           <div className="space-y-4">
             <p className="text-sm text-gray-400">Даты, когда номер недоступен для бронирования. Гости не смогут выбрать эти даты.</p>
@@ -420,12 +420,12 @@ export function HotelsManagement() {
                 className="bg-[#161b2e] border border-[#1e2537] rounded-lg px-3 py-2 text-sm text-gray-300"
               />
               <button onClick={addBlockedDate} className="px-4 py-2 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-400 rounded-lg text-sm">
-                Добавить блокировку
+                Забронировать даты
               </button>
             </div>
             <div className="space-y-2">
               {blockedDates.length === 0 ? (
-                <p className="text-sm text-gray-500">Нет заблокированных дат</p>
+                <p className="text-sm text-gray-500">Нет забронированных дат</p>
               ) : (
                 blockedDates.map((b) => (
                   <div key={b.id} className="flex items-center justify-between bg-[#161b2e] border border-[#1e2537] rounded-lg px-4 py-2">

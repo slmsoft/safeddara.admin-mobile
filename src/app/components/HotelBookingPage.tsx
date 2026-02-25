@@ -94,21 +94,20 @@ export function HotelBookingPage({ room, onBack, onContinue, onWeatherClick, onL
       return;
     }
     onContinue({
-        room: {
-          id: room.id,
-          name: room.name,
-          price: room.price,
-          image: room.image
-        },
-        checkIn,
-        checkOut,
-        guests,
-        nights,
-        totalPrice,
-        guestName: guestName.trim(),
-        guestEmail: guestEmail.trim()
-      });
-    }
+      room: {
+        id: room.id,
+        name: room.name,
+        price: room.price,
+        image: room.image
+      },
+      checkIn,
+      checkOut,
+      guests,
+      nights,
+      totalPrice,
+      guestName: guestName.trim(),
+      guestEmail: guestEmail.trim()
+    });
   };
 
   const canContinue = checkIn && checkOut && guests > 0 && guestName.trim().length > 0 && guestEmail.trim().length > 0;
