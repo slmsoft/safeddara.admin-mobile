@@ -1,0 +1,10 @@
+# Admin-mobile (adminmb.safeddara.tj)
+services:
+  admin:
+    build:
+      context: .
+      dockerfile: Dockerfile.admin
+    container_name: safeddara-admin-mobile
+    ports:
+      - "3003:80"
+    restart: unless-stopped

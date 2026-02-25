@@ -1710,20 +1710,24 @@ export default function App() {
     return <PaymentReturnPage />;
   }
 
-  // Check URL for admin panel access - /admin or /admin-mobile (deployed at safeddara.tj/admin-mobile)
+  // Check URL for admin panel access: adminmb.safeddara.tj (root) or /admin, /admin-mobile paths
   const [isAdminPanel, setIsAdminPanel] = useState(() => {
     if (typeof window === 'undefined') return false;
+    const host = window.location.hostname;
     const p = window.location.pathname;
-    return p === '/admin' || p.startsWith('/admin/') || p === '/admin-mobile' || p === '/admin-mobile/' || p.startsWith('/admin-mobile/');
+    const isAdminDomain = host.includes('adminmb') || host === 'admin.safeddara.tj';
+    return isAdminDomain || p === '/admin' || p.startsWith('/admin/') || p === '/admin-mobile' || p === '/admin-mobile/' || p.startsWith('/admin-mobile/');
   });
-  
+
   // Listen for URL changes (both pathname and hash changes)
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    
+
     const checkAdminRoute = () => {
+      const host = window.location.hostname;
       const p = window.location.pathname;
-      const isAdmin = p === '/admin' || p.startsWith('/admin/') || p === '/admin-mobile' || p === '/admin-mobile/' || p.startsWith('/admin-mobile/');
+      const isAdminDomain = host.includes('adminmb') || host === 'admin.safeddara.tj';
+      const isAdmin = isAdminDomain || p === '/admin' || p.startsWith('/admin/') || p === '/admin-mobile' || p === '/admin-mobile/' || p.startsWith('/admin-mobile/');
       setIsAdminPanel(isAdmin);
     };
     
