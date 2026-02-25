@@ -1,7 +1,14 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Search, Users, Maximize, Edit2, Trash2, Eye, Save } from 'lucide-react';
+import { Search, Users, Maximize, Edit2, Trash2, Eye, Save, CalendarX } from 'lucide-react';
 import { Modal } from './Modal';
 import { adminApi, type Accommodation } from '../../../api/backendApi';
+
+interface BlockedDateItem {
+  id: string;
+  startDate: string;
+  endDate: string;
+  reason?: string;
+}
 
 const typeToCategory: Record<string, string> = {
   cottage: 'Коттеджи',
@@ -36,6 +43,11 @@ export function HotelsManagement() {
   const [hotels, setHotels] = useState<ReturnType<typeof accToHotel>[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [blockedDatesModalOpen, setBlockedDatesModalOpen] = useState(false);
+  const [blockedDatesHotel, setBlockedDatesHotel] = useState<ReturnType<typeof accToHotel> | null>(null);
+  const [blockedDates, setBlockedDates] = useState<BlockedDateItem[]>([]);
+  const [newBlockStart, setNewBlockStart] = useState('');
+  const [newBlockEnd, setNewBlockEnd] = useState('');
 
   const loadHotels = useCallback(async () => {
     setLoading(true);
@@ -143,6 +155,58 @@ export function HotelsManagement() {
     }
   };
 
+  const openBlockedDates = async (hotel: ReturnType<typeof accToHotel>) => {
+    setBlockedDatesHotel(hotel);
+    setBlockedDatesModalOpen(true);
+    setNewBlockStart('');
+    setNewBlockEnd('');
+    try {
+      const res = await adminApi.accommodations.blockedDates.list(hotel.id);
+      if (res.success && res.data?.blockedDates) {
+        setBlockedDates(res.data.blockedDates);
+      } else {
+        setBlockedDates([]);
+      }
+    } catch (e) {
+      setBlockedDates([]);
+    }
+  };
+
+  const addBlockedDate = async () => {
+    if (!blockedDatesHotel || !newBlockStart || !newBlockEnd) return;
+    const start = new Date(newBlockStart);
+    const end = new Date(newBlockEnd);
+    if (end <= start) {
+      alert('Дата окончания должна быть позже даты начала');
+      return;
+    }
+    try {
+      const res = await adminApi.accommodations.blockedDates.create(blockedDatesHotel.id, {
+        startDate: newBlockStart,
+        endDate: newBlockEnd,
+      });
+      if (res.success && res.data?.blockedDate) {
+        setBlockedDates([...blockedDates, res.data.blockedDate]);
+        setNewBlockStart('');
+        setNewBlockEnd('');
+      }
+    } catch (e) {
+      alert((e as Error).message || 'Ошибка');
+    }
+  };
+
+  const removeBlockedDate = async (blockId: string) => {
+    if (!confirm('Удалить блокировку?')) return;
+    try {
+      await adminApi.accommodations.blockedDates.delete(blockId);
+      setBlockedDates(blockedDates.filter(b => b.id !== blockId));
+    } catch (e) {
+      alert((e as Error).message || 'Ошибка');
+    }
+  };
+
+  const formatBlockDate = (d: string) => new Date(d).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', year: 'numeric' });
+
   const categories = ['all', ...Array.from(new Set(hotels.map(h => h.category)))];
   const availableCount = hotels.filter(h => h.isAvailable).length;
 
@@ -192,7 +256,7 @@ export function HotelsManagement() {
         </div>
       </div>
 
-      <div className="grid grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {filteredHotels.map((hotel) => (
           <div key={hotel.id} className="bg-[#161b2e] border border-[#1e2537] rounded-xl overflow-hidden hover:border-blue-500/50 transition-all group">
             <div className="relative h-40 overflow-hidden">
@@ -221,6 +285,9 @@ export function HotelsManagement() {
               <div className="flex items-center gap-2">
                 <button onClick={() => handleView(hotel)} className="flex-1 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/30 text-blue-400 text-xs py-2 rounded-lg flex items-center justify-center gap-1">
                   <Eye className="w-3 h-3" /> Просмотр
+                </button>
+                <button onClick={() => openBlockedDates(hotel)} className="bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-400 p-2 rounded-lg" title="Заблокировать даты">
+                  <CalendarX className="w-3 h-3" />
                 </button>
                 <button onClick={() => handleEdit(hotel)} className="bg-[#0d1117] hover:bg-[#1e2537] border border-[#1e2537] text-gray-400 p-2 rounded-lg">
                   <Edit2 className="w-3 h-3" />
@@ -330,6 +397,47 @@ export function HotelsManagement() {
               <button onClick={handleSave} disabled={saving} className="flex items-center gap-2 px-6 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg disabled:opacity-50">
                 <Save className="w-4 h-4" /> {saving ? 'Сохранение...' : 'Сохранить'}
               </button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      <Modal isOpen={blockedDatesModalOpen} onClose={() => setBlockedDatesModalOpen(false)} title={blockedDatesHotel ? `Заблокированные даты: ${blockedDatesHotel.name}` : 'Заблокированные даты'} size="lg">
+        {blockedDatesHotel && (
+          <div className="space-y-4">
+            <p className="text-sm text-gray-400">Даты, когда номер недоступен для бронирования. Гости не смогут выбрать эти даты.</p>
+            <div className="flex gap-2 flex-wrap">
+              <input
+                type="date"
+                value={newBlockStart}
+                onChange={(e) => setNewBlockStart(e.target.value)}
+                className="bg-[#161b2e] border border-[#1e2537] rounded-lg px-3 py-2 text-sm text-gray-300"
+              />
+              <input
+                type="date"
+                value={newBlockEnd}
+                onChange={(e) => setNewBlockEnd(e.target.value)}
+                className="bg-[#161b2e] border border-[#1e2537] rounded-lg px-3 py-2 text-sm text-gray-300"
+              />
+              <button onClick={addBlockedDate} className="px-4 py-2 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-400 rounded-lg text-sm">
+                Добавить блокировку
+              </button>
+            </div>
+            <div className="space-y-2">
+              {blockedDates.length === 0 ? (
+                <p className="text-sm text-gray-500">Нет заблокированных дат</p>
+              ) : (
+                blockedDates.map((b) => (
+                  <div key={b.id} className="flex items-center justify-between bg-[#161b2e] border border-[#1e2537] rounded-lg px-4 py-2">
+                    <span className="text-sm text-gray-300">
+                      {formatBlockDate(b.startDate)} — {formatBlockDate(b.endDate)}
+                    </span>
+                    <button onClick={() => removeBlockedDate(b.id)} className="text-red-400 hover:text-red-300 text-sm">
+                      Удалить
+                    </button>
+                  </div>
+                ))
+              )}
             </div>
           </div>
         )}

@@ -305,6 +305,7 @@ function AppContent() {
   // Favorites state
   const [favoriteHotels, setFavoriteHotels] = useState<string[]>([]);
   const [favoriteHotelData, setFavoriteHotelData] = useState<any[]>([]);
+  const [favoriteRestaurantItems, setFavoriteRestaurantItems] = useState<Array<{ id: string; name: string; price: number; image: string; category: string }>>([]);
   
   // Function to close all modals
   const closeAllModals = () => {
@@ -422,29 +423,43 @@ function AppContent() {
   // Toggle favorite hotel
   const handleToggleFavorite = (itemId: string, item: any) => {
     if (favoriteHotels.includes(itemId)) {
-      // Remove from favorites
       setFavoriteHotels(prev => prev.filter(id => id !== itemId));
       setFavoriteHotelData(prev => prev.filter(hotel => hotel.id !== itemId));
     } else {
-      // Add to favorites
       setFavoriteHotels(prev => [...prev, itemId]);
       setFavoriteHotelData(prev => [...prev, item]);
     }
   };
+
+  // Toggle favorite restaurant item
+  const handleToggleRestaurantFavorite = (item: { id: string; name: string; price: number; image: string; category: string }) => {
+    const exists = favoriteRestaurantItems.some((f) => f.id === item.id);
+    if (exists) {
+      setFavoriteRestaurantItems((prev) => prev.filter((f) => f.id !== item.id));
+    } else {
+      setFavoriteRestaurantItems((prev) => [...prev, item]);
+    }
+  };
   
-  // Handle favorite item click - navigate to booking
+  // Handle favorite item click - hotel: booking, restaurant: open menu
   const handleFavoriteItemClick = (item: any) => {
-    setSelectedRoom({
-      id: item.id,
-      name: item.title,
-      category: 'Изранное',
-      area: 45,
-      beds: item.capacity,
-      price: item.price,
-      image: item.images[0]
-    });
-    setShowFavorites(false);
-    setShowHotelBooking(true);
+    if (item.type === 'restaurant') {
+      setShowFavorites(false);
+      setRestaurantInitialCategory(item.category);
+      setShowRestaurantMenu(true);
+    } else {
+      setSelectedRoom({
+        id: item.id,
+        name: item.title,
+        category: 'Избранное',
+        area: 45,
+        beds: item.capacity,
+        price: item.price,
+        image: item.images[0]
+      });
+      setShowFavorites(false);
+      setShowHotelBooking(true);
+    }
   };
 
   // Add to cart function - накапливает товары из разных разделов
@@ -860,7 +875,7 @@ function AppContent() {
           closeAllModals();
           setShowFavorites(true);
         }}
-        favoritesCount={favoriteHotels.length}
+        favoritesCount={favoriteHotels.length + favoriteRestaurantItems.length}
         onLogoClick={() => {
           // Return to home
           closeAllModals();
@@ -1050,11 +1065,13 @@ function AppContent() {
           <RestaurantMenuPage 
             onBack={() => {
               setShowRestaurantMenu(false);
-              setRestaurantInitialCategory(undefined); // Reset category when going back
+              setRestaurantInitialCategory(undefined);
             }}
             onWeatherClick={() => setShowWeather(true)}
             onLiveClick={() => setShowCameras(true)}
             initialCategory={restaurantInitialCategory}
+            favoriteIds={favoriteRestaurantItems.map((f) => f.id)}
+            onToggleFavorite={handleToggleRestaurantFavorite}
           />
         ) : showEvents ? (
           <EventsPage 
@@ -1205,15 +1222,22 @@ function AppContent() {
             {/* Mobile Version */}
             <div className="lg:hidden">
               <FavoritesPage
-                favorites={favoriteHotelData}
+                favorites={[
+                  ...favoriteHotelData.map((h) => ({ type: 'hotel' as const, id: h.id, title: h.title, capacity: h.capacity, price: h.price, images: h.images })),
+                  ...favoriteRestaurantItems.map((r) => ({ type: 'restaurant' as const, id: r.id, title: r.name, price: r.price, images: [r.image], category: r.category })),
+                ]}
                 onBack={() => {
                   setShowFavorites(false);
                   setCurrentPage('profile');
                 }}
                 onItemClick={handleFavoriteItemClick}
-                onRemoveFavorite={(itemId) => {
-                  setFavoriteHotels(prev => prev.filter(id => id !== itemId));
-                  setFavoriteHotelData(prev => prev.filter(hotel => hotel.id !== itemId));
+                onRemoveFavorite={(itemId, itemType) => {
+                  if (itemType === 'hotel') {
+                    setFavoriteHotels((prev) => prev.filter((id) => id !== itemId));
+                    setFavoriteHotelData((prev) => prev.filter((h) => h.id !== itemId));
+                  } else {
+                    setFavoriteRestaurantItems((prev) => prev.filter((f) => f.id !== itemId));
+                  }
                 }}
               />
             </div>
@@ -1221,15 +1245,22 @@ function AppContent() {
             {/* Desktop Version */}
             <div className="hidden lg:block">
               <WebFavoritesPage
-                favorites={favoriteHotelData}
+                favorites={[
+                  ...favoriteHotelData.map((h) => ({ type: 'hotel' as const, id: h.id, title: h.title, capacity: String(h.capacity), price: h.price, images: h.images })),
+                  ...favoriteRestaurantItems.map((r) => ({ type: 'restaurant' as const, id: r.id, title: r.name, price: r.price, images: [r.image], category: r.category })),
+                ]}
                 onBack={() => {
                   setShowFavorites(false);
                   setCurrentPage('profile');
                 }}
                 onItemClick={handleFavoriteItemClick}
                 onRemoveFavorite={(itemId) => {
-                  setFavoriteHotels(prev => prev.filter(id => id !== itemId));
-                  setFavoriteHotelData(prev => prev.filter(hotel => hotel.id !== itemId));
+                  if (favoriteHotelData.some((h) => h.id === itemId)) {
+                    setFavoriteHotels((prev) => prev.filter((id) => id !== itemId));
+                    setFavoriteHotelData((prev) => prev.filter((h) => h.id !== itemId));
+                  } else {
+                    setFavoriteRestaurantItems((prev) => prev.filter((f) => f.id !== itemId));
+                  }
                 }}
               />
             </div>
@@ -1679,10 +1710,11 @@ export default function App() {
     return <PaymentReturnPage />;
   }
 
-  // Check URL for admin panel access - only via /admin path
+  // Check URL for admin panel access - /admin or /admin-mobile (deployed at safeddara.tj/admin-mobile)
   const [isAdminPanel, setIsAdminPanel] = useState(() => {
     if (typeof window === 'undefined') return false;
-    return window.location.pathname === '/admin' || window.location.pathname.startsWith('/admin/');
+    const p = window.location.pathname;
+    return p === '/admin' || p.startsWith('/admin/') || p === '/admin-mobile' || p === '/admin-mobile/' || p.startsWith('/admin-mobile/');
   });
   
   // Listen for URL changes (both pathname and hash changes)
@@ -1690,7 +1722,8 @@ export default function App() {
     if (typeof window === 'undefined') return;
     
     const checkAdminRoute = () => {
-      const isAdmin = window.location.pathname === '/admin' || window.location.pathname.startsWith('/admin/');
+      const p = window.location.pathname;
+      const isAdmin = p === '/admin' || p.startsWith('/admin/') || p === '/admin-mobile' || p === '/admin-mobile/' || p.startsWith('/admin-mobile/');
       setIsAdminPanel(isAdmin);
     };
     

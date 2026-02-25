@@ -4,6 +4,7 @@
  */
 
 import { getSessionId } from './auth';
+import { adminAuthFetch } from './adminAuth';
 
 const BACKEND_API_BASE =
   typeof import.meta !== 'undefined' && import.meta.env?.VITE_BACKEND_API_URL
@@ -117,6 +118,18 @@ export const backendApi = {
     );
   },
 
+  async getBlockedDates(accommodationId: string, from?: string, to?: string) {
+    const params = new URLSearchParams();
+    if (from) params.set('from', from);
+    if (to) params.set('to', to);
+    const q = params.toString() ? `?${params}` : '';
+    return backendFetch<{ blockedDates: Array<{ id: string; startDate: string; endDate: string; reason?: string }> }>(
+      `/accommodations/${accommodationId}/blocked-dates${q}`,
+      { method: 'GET' },
+      false
+    );
+  },
+
   async createBooking(body: CreateBookingBody) {
     return backendFetch<CreateBookingResponse>('/bookings', {
       method: 'POST',
@@ -190,18 +203,9 @@ export interface RestaurantCategory {
   }>;
 }
 
-/** Admin API — без auth (админка) */
-const ADMIN_BASE = `${BACKEND_API_BASE}/admin`;
-
-async function adminFetch<T>(path: string, options: RequestInit = {}): Promise<{ success: boolean; data?: T; message?: string }> {
-  const url = `${ADMIN_BASE}${path}`;
-  const res = await fetch(url, {
-    ...options,
-    headers: { 'Content-Type': 'application/json', ...(options.headers as Record<string, string>) },
-  });
-  const json = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(json?.message || `HTTP ${res.status}`);
-  return json;
+/** Admin API — JWT auth via adminAuthFetch */
+function adminFetch<T>(path: string, options: RequestInit = {}): Promise<{ success: boolean; data?: T; message?: string }> {
+  return adminAuthFetch<T>(path, options);
 }
 
 export const adminApi = {
@@ -212,6 +216,12 @@ export const adminApi = {
     update: (id: string, body: Partial<Accommodation>) =>
       adminFetch<{ accommodation: Accommodation }>(`/accommodations/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
     delete: (id: string) => adminFetch(`/accommodations/${id}`, { method: 'DELETE' }),
+    blockedDates: {
+      list: (id: string) => adminFetch<{ blockedDates: Array<{ id: string; startDate: string; endDate: string; reason?: string }> }>(`/accommodations/${id}/blocked-dates`),
+      create: (id: string, body: { startDate: string; endDate: string; reason?: string }) =>
+        adminFetch<{ blockedDate: { id: string; startDate: string; endDate: string; reason?: string } }>(`/accommodations/${id}/blocked-dates`, { method: 'POST', body: JSON.stringify(body) }),
+      delete: (blockedDateId: string) => adminFetch(`/blocked-dates/${blockedDateId}`, { method: 'DELETE' }),
+    },
   },
   news: {
     list: () => adminFetch<{ news: Array<{ id: string; title: string; content: string; image?: string; category: string; isPublished: boolean; publishedAt?: string }> }>('/news'),
@@ -247,4 +257,22 @@ export const adminApi = {
     orders: () => adminFetch<{ orders: Array<{ id: string; userId: string; customerName: string; customerEmail: string; orderType: string; status: string; startDate: string; endDate: string; externalId: string | null; createdAt: string }> }>('/safeddara/orders'),
     payments: () => adminFetch<{ payments: Array<{ id: number; userId: string; orderId: string; totalAmount: number; status: string; orderUrl: string | null; createdAt: string }> }>('/safeddara/payments'),
   },
+  admins: {
+    list: () => adminFetch<{ admins: Array<{ id: string; email: string; role: string; createdAt: string }> }>('/admins'),
+    create: (body: { email: string; password: string; role: 'admin' | 'accountant' }) =>
+      adminFetch<{ admin: { id: string; email: string; role: string; createdAt: string } }>('/admins', { method: 'POST', body: JSON.stringify(body) }),
+    update: (id: string, body: { email?: string; password?: string }) =>
+      adminFetch<{ admin: { id: string; email: string; role: string; createdAt: string } }>(`/admins/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+    delete: (id: string) => adminFetch(`/admins/${id}`, { method: 'DELETE' }),
+  },
+  stats: () =>
+    adminFetch<{
+      pageviews: number;
+      monthlyUsers: number;
+      newSignups: number;
+      bookingsCount: number;
+      totalRevenue: number;
+      recentActivity: Array<{ type: string; user: string; action: string; time: string }>;
+      revenueData?: Array<{ month: string; revenue: number }>;
+    }>('/stats'),
 };

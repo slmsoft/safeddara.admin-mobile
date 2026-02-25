@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { AdminLayout } from './AdminLayout';
 import { AdminLoginPage } from './AdminLoginPage';
 import { AdminDashboard } from './AdminDashboard';
@@ -16,67 +16,82 @@ import { CamerasManagement } from './CamerasManagement';
 import { RulesManagement } from './RulesManagement';
 import { AboutManagement } from './AboutManagement';
 import { SettingsManagement } from './SettingsManagement';
+import { AdminsManagement } from './AdminsManagement';
+import { getAdminToken, clearAdminToken, adminMe } from '../../../api/adminAuth';
 
 type UserRole = 'superadmin' | 'admin' | 'accountant';
 
 interface AdminUser {
+  id: string;
   username: string;
   role: UserRole;
 }
 
-// Mock authentication - в реальном приложении это будет через API
-const authenticateUser = (username: string, password: string): AdminUser | null => {
-  const users = {
-    'admin@safedara.tj': { username: 'admin@safedara.tj', role: 'superadmin' as UserRole },
-    'manager@safedara.tj': { username: 'manager@safedara.tj', role: 'admin' as UserRole },
-    'accountant@safedara.tj': { username: 'accountant@safedara.tj', role: 'accountant' as UserRole }
-  };
-
-  const validPasswords = {
-    'admin@safedara.tj': 'admin123',
-    'manager@safedara.tj': 'manager123',
-    'accountant@safedara.tj': 'accountant123'
-  };
-
-  if (validPasswords[username as keyof typeof validPasswords] === password) {
-    return users[username as keyof typeof users];
-  }
-
-  return null;
-};
-
 export function AdminApp() {
   const [currentUser, setCurrentUser] = useState<AdminUser | null>(null);
   const [currentPage, setCurrentPage] = useState('dashboard');
+  const [authChecking, setAuthChecking] = useState(true);
 
-  const handleLogin = (username: string, password: string) => {
-    console.log('Попытка входа с:', { username, password });
-    const user = authenticateUser(username, password);
-    console.log('Результат аутентификации:', user);
-    if (user) {
-      setCurrentUser(user);
-      setCurrentPage('dashboard');
-      console.log('Вход выполнен успешно! Пользователь:', user);
-    } else {
-      console.error('Неудачная попытка входа');
+  useEffect(() => {
+    const token = getAdminToken();
+    if (!token) {
+      setAuthChecking(false);
+      return;
     }
+    adminMe()
+      .then((res) => {
+        if (res.success && res.data?.admin) {
+          const a = res.data.admin;
+          setCurrentUser({
+            id: a.id,
+            username: a.email,
+            role: a.role as UserRole,
+          });
+        } else {
+          clearAdminToken();
+        }
+      })
+      .catch(() => {
+        clearAdminToken();
+      })
+      .finally(() => {
+        setAuthChecking(false);
+      });
+  }, []);
+
+  const handleLogin = (admin: { id: string; email: string; role: string }) => {
+    setCurrentUser({
+      id: admin.id,
+      username: admin.email,
+      role: admin.role as UserRole,
+    });
+    setCurrentPage('dashboard');
   };
 
   const handleLogout = () => {
+    clearAdminToken();
     setCurrentUser(null);
     setCurrentPage('dashboard');
   };
 
-  // If not logged in, show login page
+  if (authChecking) {
+    return (
+      <div className="min-h-screen bg-[#0a0e1a] flex items-center justify-center">
+        <div className="animate-spin w-10 h-10 border-2 border-purple-500 border-t-transparent rounded-full" />
+      </div>
+    );
+  }
+
   if (!currentUser) {
     return <AdminLoginPage onLogin={handleLogin} />;
   }
 
-  // Render current page content
   const renderPageContent = () => {
     switch (currentPage) {
       case 'dashboard':
         return <AdminDashboard userRole={currentUser.role} />;
+      case 'admins':
+        return <AdminsManagement />;
       case 'users':
         return <UsersManagement />;
       case 'bookings':
@@ -110,12 +125,16 @@ export function AdminApp() {
     }
   };
 
-  // Get page title and action button
   const getPageConfig = () => {
     const configs: Record<string, { title?: string; subtitle?: string; action?: { label: string; onClick: () => void } }> = {
       dashboard: {
         title: `Добро пожаловать, ${currentUser.username.split('@')[0]}`,
         subtitle: 'Отслеживайте статистику и управляйте курортом.'
+      },
+      admins: {
+        title: 'Управление',
+        subtitle: 'Создание и управление учётными записями администраторов.',
+        action: { label: 'Добавить админа', onClick: () => { const h = (window as any).__adminsAddHandler; if (h) h(); } }
       },
       users: {
         title: 'Пользователи',
@@ -125,8 +144,8 @@ export function AdminApp() {
       hotels: {
         title: 'Гостиницы и номера',
         subtitle: 'Управление размещением и доступностью номеров.',
-        action: { 
-          label: 'Добавить номер', 
+        action: {
+          label: 'Добавить номер',
           onClick: () => {
             const handler = (window as any).__hotelsAddHandler;
             if (handler) handler();
@@ -140,8 +159,8 @@ export function AdminApp() {
       services: {
         title: 'Услуги',
         subtitle: 'Управление арендой оборудования и дополнительными услугами.',
-        action: { 
-          label: 'Добавить услугу', 
+        action: {
+          label: 'Добавить услугу',
           onClick: () => {
             const handler = (window as any).__servicesAddHandler;
             if (handler) handler();
@@ -155,8 +174,8 @@ export function AdminApp() {
       news: {
         title: 'Новости',
         subtitle: 'Публикация и управление новостными статьями.',
-        action: { 
-          label: 'Создать новость', 
+        action: {
+          label: 'Создать новость',
           onClick: () => {
             const handler = (window as any).__newsAddHandler;
             if (handler) handler();
@@ -166,8 +185,8 @@ export function AdminApp() {
       restaurant: {
         title: 'Ресторан',
         subtitle: 'Управление меню и заказами ресторана.',
-        action: { 
-          label: 'Добавить блюдо', 
+        action: {
+          label: 'Добавить блюдо',
           onClick: () => {
             const handler = (window as any).__restaurantAddHandler;
             if (handler) handler();

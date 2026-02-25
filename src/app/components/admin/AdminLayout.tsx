@@ -1,4 +1,4 @@
-import { ReactNode } from 'react';
+import { ReactNode, useState } from 'react';
 import { AdminSidebar } from './AdminSidebar';
 import { AdminHeader } from './AdminHeader';
 
@@ -28,18 +28,28 @@ export function AdminLayout({
   headerSubtitle,
   headerAction
 }: AdminLayoutProps) {
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  const handleNavigate = (page: string) => {
+    onNavigate(page);
+    setSidebarOpen(false);
+  };
+
   return (
     <div className="min-h-screen bg-[#0a0e1a] flex">
       {/* Sidebar */}
       <AdminSidebar
         currentPage={currentPage}
-        onNavigate={onNavigate}
+        onNavigate={handleNavigate}
         userRole={userRole}
         username={username}
+        onLogout={onLogout}
+        isOpen={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
       />
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col ml-[220px]">
+      <div className="flex-1 flex flex-col min-w-0 md:ml-[220px]">
         {/* Header */}
         <AdminHeader
           username={username}
@@ -48,10 +58,11 @@ export function AdminLayout({
           title={headerTitle}
           subtitle={headerSubtitle}
           actionButton={headerAction}
+          onMenuClick={() => setSidebarOpen(true)}
         />
 
         {/* Page Content */}
-        <main className="flex-1 p-8">
+        <main className="flex-1 p-4 sm:p-6 lg:p-8">
           {children}
         </main>
       </div>

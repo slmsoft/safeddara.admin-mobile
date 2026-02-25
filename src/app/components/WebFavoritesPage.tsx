@@ -1,12 +1,8 @@
 import { ChevronLeft, Heart } from 'lucide-react';
 
-interface FavoriteItem {
-  id: string;
-  title: string;
-  capacity: string;
-  price: number;
-  images: string[];
-}
+type FavoriteItem =
+  | { type: 'hotel'; id: string; title: string; capacity: string; price: number; images: string[] }
+  | { type: 'restaurant'; id: string; title: string; price: number; images: string[]; category?: string };
 
 interface WebFavoritesPageProps {
   favorites: FavoriteItem[];
@@ -53,39 +49,52 @@ export function WebFavoritesPage({ favorites, onBack, onItemClick, onRemoveFavor
             </div>
           </div>
         ) : (
-          /* Favorites Grid */
-          <div className="grid grid-cols-4 gap-6">
+          /* Favorites Grid — карточки как в меню ресторана */
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 lg:gap-6">
             {favorites.map((item) => (
               <div
-                key={item.id}
-                className="bg-white border border-gray-200 rounded-2xl overflow-hidden hover:shadow-lg transition-shadow cursor-pointer group"
+                key={`${item.type}-${item.id}`}
+                className="bg-[#71bcf0]/12 rounded-2xl shadow-md hover:shadow-lg transition-shadow overflow-hidden flex flex-col border border-[#71bcf0]/20"
               >
-                <div className="relative" onClick={() => onItemClick(item)}>
-                  <img
-                    src={item.images[0]}
-                    alt={item.title}
-                    className="w-full h-48 object-cover"
-                  />
+                <div className="relative pt-4 px-4 flex justify-center">
                   <button
+                    type="button"
+                    className="absolute top-2 right-2 z-10 w-8 h-8 rounded-full bg-white/90 shadow flex items-center justify-center hover:scale-105 transition-transform"
                     onClick={(e) => {
                       e.stopPropagation();
                       onRemoveFavorite(item.id);
                     }}
-                    className="absolute top-3 right-3 w-9 h-9 bg-white/95 backdrop-blur-sm rounded-full flex items-center justify-center hover:bg-white transition-all shadow-md"
+                    aria-label="Убрать из избранного"
                   >
-                    <Heart className="w-5 h-5 text-red-500 fill-red-500" />
+                    <Heart className="w-4 h-4 fill-red-500 text-red-500" />
                   </button>
+                  <div
+                    className="w-20 h-20 sm:w-24 sm:h-24 rounded-full overflow-hidden bg-gray-100 flex-shrink-0 cursor-pointer"
+                    onClick={() => onItemClick(item)}
+                  >
+                    <img
+                      src={item.images[0]}
+                      alt={item.title}
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
                 </div>
-                
-                <div className="p-4" onClick={() => onItemClick(item)}>
-                  <h3 className="text-base font-bold text-gray-900 mb-2 line-clamp-2">
+                <div className="p-3 pt-2 flex-1 flex flex-col">
+                  <h3
+                    className="font-semibold text-gray-900 text-sm sm:text-base line-clamp-2 mb-0.5 cursor-pointer"
+                    onClick={() => onItemClick(item)}
+                  >
                     {item.title}
                   </h3>
-                  <p className="text-sm text-gray-500 mb-3">{item.capacity}</p>
-                  <div className="flex items-center justify-between">
-                    <span className="text-lg font-bold text-gray-900">
-                      {item.price.toLocaleString('ru-RU')} смн
-                    </span>
+                  <p className="text-gray-600 text-sm mb-3">{item.price} смн</p>
+                  <div className="mt-auto flex justify-end">
+                    <button
+                      type="button"
+                      className="px-4 py-2 rounded-full bg-[#71bcf0] text-white text-xs font-medium hover:bg-[#5aa8dc] transition-all shadow-md"
+                      onClick={() => onItemClick(item)}
+                    >
+                      {item.type === 'hotel' ? 'Забронировать' : 'В меню'}
+                    </button>
                   </div>
                 </div>
               </div>

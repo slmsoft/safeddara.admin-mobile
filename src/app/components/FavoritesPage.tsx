@@ -1,20 +1,16 @@
-import { ChevronLeft, Users } from 'lucide-react';
+import { ChevronLeft } from 'lucide-react';
 import { ImageWithFallback } from './figma/ImageWithFallback';
 import { FavoriteIcon } from './ProfileIcons';
 
-interface FavoriteItem {
-  id: string;
-  title: string;
-  capacity: number;
-  price: number;
-  images: string[];
-}
+type FavoriteItem =
+  | { type: 'hotel'; id: string; title: string; capacity: number; price: number; images: string[] }
+  | { type: 'restaurant'; id: string; title: string; price: number; images: string[]; category?: string };
 
 interface FavoritesPageProps {
   onBack?: () => void;
   favorites?: FavoriteItem[];
   onItemClick?: (item: FavoriteItem) => void;
-  onRemoveFavorite?: (itemId: string) => void;
+  onRemoveFavorite?: (itemId: string, itemType?: 'hotel' | 'restaurant') => void;
 }
 
 export function FavoritesPage({ onBack, favorites = [], onItemClick, onRemoveFavorite }: FavoritesPageProps) {
@@ -22,7 +18,7 @@ export function FavoritesPage({ onBack, favorites = [], onItemClick, onRemoveFav
     <div className="min-h-screen bg-white">
       {/* Header */}
       <div className="bg-white sticky top-0 z-10">
-        <div className="px-5 py-4">
+        <div className="px-5 py-4 max-w-[402px] mx-auto">
           <div className="flex items-center gap-4">
             <button
               onClick={() => onBack?.()}
@@ -39,7 +35,7 @@ export function FavoritesPage({ onBack, favorites = [], onItemClick, onRemoveFav
         </div>
       </div>
 
-      {/* Content */}
+      {/* Content — карточки как в меню ресторана */}
       {favorites.length === 0 ? (
         <div className="flex flex-col items-center justify-center px-5 pt-48">
           <h2 className="font-bold text-gray-900 mb-2 text-center">
@@ -51,65 +47,57 @@ export function FavoritesPage({ onBack, favorites = [], onItemClick, onRemoveFav
           </p>
         </div>
       ) : (
-        <div className="px-5 pb-24">
-          <div className="space-y-4">
+        <div className="px-5 pb-24 max-w-[402px] mx-auto">
+          <div className="grid grid-cols-2 gap-4">
             {favorites.map((item, index) => (
               <div
-                key={item.id}
-                className="bg-white rounded-2xl overflow-hidden shadow-md hover:shadow-lg transition-shadow duration-300"
+                key={`${item.type}-${item.id}`}
+                className="bg-[#71bcf0]/12 rounded-2xl shadow-md hover:shadow-lg transition-shadow overflow-hidden flex flex-col border border-[#71bcf0]/20"
                 style={{
-                  animation: `fadeInUp 0.4s ease-out ${index * 0.1}s backwards`
+                  animation: `fadeInUp 0.4s ease-out ${index * 0.05}s backwards`
                 }}
               >
-                {/* Image */}
-                <div 
-                  className="relative h-48 overflow-hidden cursor-pointer"
-                  onClick={() => onItemClick && onItemClick(item)}
-                >
-                  <ImageWithFallback
-                    src={item.images[0]}
-                    alt={item.title}
-                    className="w-full h-full object-cover"
-                  />
-                  
-                  {/* Remove from favorites button */}
+                {/* Круглое фото + сердечко (как в меню ресторана) */}
+                <div className="relative pt-4 px-4 flex justify-center">
                   <button
-                    className="absolute top-3 right-3 bg-white/95 backdrop-blur-sm rounded-full p-2 shadow-md hover:scale-110 transition-transform z-10"
+                    type="button"
+                    className="absolute top-2 right-2 z-10 w-8 h-8 rounded-full bg-white/90 shadow flex items-center justify-center"
                     onClick={(e) => {
                       e.stopPropagation();
-                      onRemoveFavorite && onRemoveFavorite(item.id);
+                      onRemoveFavorite && onRemoveFavorite(item.id, item.type);
                     }}
+                    aria-label="Убрать из избранного"
                   >
-                    <FavoriteIcon className="w-5 h-5 fill-red-500 text-red-500" />
+                    <FavoriteIcon className="w-4 h-4 fill-red-500 text-red-500" />
                   </button>
-                  
-                  {/* Capacity badge */}
-                  <div className="absolute top-3 left-3 bg-white/95 backdrop-blur-sm rounded-full px-3 py-1.5 flex items-center gap-1.5 shadow-md">
-                    <Users className="w-4 h-4 text-[#71bcf0]" />
-                    <span className="text-sm font-semibold text-gray-700">{item.capacity}</span>
+                  <div
+                    className="w-20 h-20 sm:w-24 sm:h-24 rounded-full overflow-hidden bg-gray-100 flex-shrink-0 cursor-pointer"
+                    onClick={() => onItemClick && onItemClick(item)}
+                  >
+                    <ImageWithFallback
+                      src={item.images[0]}
+                      alt={item.title}
+                      className="w-full h-full object-cover"
+                    />
                   </div>
                 </div>
 
-                {/* Info */}
-                <div className="p-4">
-                  <h3 className="text-base font-bold text-gray-900 mb-3">{item.title}</h3>
-                  
-                  <div className="flex items-center justify-between">
-                    <div className="flex flex-col">
-                      <span className="text-xs text-gray-500 mb-1">Цена за ночь</span>
-                      <div className="flex items-baseline gap-1">
-                        <span className="text-lg font-bold text-[#71bcf0]">
-                          {item.price.toLocaleString('ru-RU')}
-                        </span>
-                        <span className="text-sm text-gray-600">смн</span>
-                      </div>
-                    </div>
-                    
+                {/* Название, цена, кнопка */}
+                <div className="p-3 pt-2 flex-1 flex flex-col">
+                  <h3
+                    className="font-semibold text-gray-900 text-sm sm:text-base line-clamp-2 mb-0.5 cursor-pointer"
+                    onClick={() => onItemClick && onItemClick(item)}
+                  >
+                    {item.title}
+                  </h3>
+                  <p className="text-gray-600 text-sm mb-3">{item.price} смн</p>
+                  <div className="mt-auto flex justify-end">
                     <button
-                      className="px-6 py-2.5 bg-gradient-to-r from-green-500 to-green-600 text-white rounded-full font-semibold text-sm hover:shadow-lg transition-all duration-300 hover:scale-105"
+                      type="button"
+                      className="px-4 py-2 rounded-full bg-[#71bcf0] text-white text-xs font-medium hover:bg-[#5aa8dc] active:scale-95 transition-all shadow-md"
                       onClick={() => onItemClick && onItemClick(item)}
                     >
-                      Забронировать
+                      {item.type === 'hotel' ? 'Забронировать' : 'В меню'}
                     </button>
                   </div>
                 </div>

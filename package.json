@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "build": "vite build",
+    "build:admin-mobile": "vite build --mode admin-mobile",
     "dev": "vite"
   },
   "dependencies": {

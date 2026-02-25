@@ -304,9 +304,9 @@ export function HotelsPage({ onWeatherClick, onLiveClick, onBack, onRoomSelect, 
           </div>
         </div>
 
-        {/* All Tabs in ONE row with horizontal scroll */}
+        {/* All Tabs in ONE row with horizontal scroll — выравнивание с карточками */}
         <div className="w-full max-w-[402px] mx-auto px-5 pb-3 overflow-x-hidden box-border">
-          <div className="flex gap-2 overflow-x-auto scrollbar-hide w-full pl-[7mm]">
+          <div className="flex gap-2 overflow-x-auto scrollbar-hide w-full">
             {tabs.map((tab) => (
               <button
                 key={tab.id}
@@ -341,9 +341,9 @@ export function HotelsPage({ onWeatherClick, onLiveClick, onBack, onRoomSelect, 
           </div>
         </div>
 
-        {/* Desktop Tabs */}
+        {/* Desktop Tabs — выравнивание с карточками */}
         <div className="px-8 py-4 w-full overflow-x-hidden">
-          <div className="max-w-[1400px] mx-auto flex gap-2 w-full pl-[7mm]">
+          <div className="max-w-[1400px] mx-auto flex gap-2 w-full">
             {tabs.map((tab) => (
               <button
                 key={tab.id}

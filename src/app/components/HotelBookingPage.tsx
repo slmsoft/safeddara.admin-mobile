@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { ChevronLeft, Calendar, Users, Minus, Plus, ChevronRight, Wifi, Coffee, Tv, Wind, ShowerHead, UtensilsCrossed } from 'lucide-react';
 import { ModernHeader } from './ModernHeader';
+import { backendApi } from '../../api/backendApi';
 
 interface HotelBookingPageProps {
   room: {
@@ -45,6 +46,19 @@ export function HotelBookingPage({ room, onBack, onContinue, onWeatherClick, onL
   const [guestEmail, setGuestEmail] = useState('');
   const [galleryOpen, setGalleryOpen] = useState(false);
   const [galleryIndex, setGalleryIndex] = useState(0);
+  const [blockedRanges, setBlockedRanges] = useState<Array<{ startDate: string; endDate: string }>>([]);
+
+  useEffect(() => {
+    const from = new Date();
+    const to = new Date(from.getFullYear() + 1, 11, 31);
+    backendApi.getBlockedDates(room.id, from.toISOString().split('T')[0], to.toISOString().split('T')[0])
+      .then((res) => {
+        if (res.success && res.data?.blockedDates) {
+          setBlockedRanges(res.data.blockedDates.map(b => ({ startDate: b.startDate, endDate: b.endDate })));
+        }
+      })
+      .catch(() => setBlockedRanges([]));
+  }, [room.id]);
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -65,9 +79,21 @@ export function HotelBookingPage({ room, onBack, onContinue, onWeatherClick, onL
     }
   };
 
-  const handleContinue = () => {
-    if (checkIn && checkOut && guests > 0 && guestName.trim() && guestEmail.trim()) {
-      onContinue({
+  const handleContinue = async () => {
+    if (!checkIn || !checkOut || guests <= 0 || !guestName.trim() || !guestEmail.trim()) return;
+    const checkInStr = checkIn.toISOString().split('T')[0];
+    const checkOutStr = checkOut.toISOString().split('T')[0];
+    try {
+      const res = await backendApi.checkAvailability(room.id, checkInStr, checkOutStr);
+      if (!res.success || !res.data?.available) {
+        alert('Выбранные даты недоступны для бронирования. Выберите другие даты.');
+        return;
+      }
+    } catch {
+      alert('Не удалось проверить доступность. Попробуйте позже.');
+      return;
+    }
+    onContinue({
         room: {
           id: room.id,
           name: room.name,
@@ -325,6 +351,7 @@ export function HotelBookingPage({ room, onBack, onContinue, onWeatherClick, onL
                   onDateSelect={handleDateSelect}
                   checkInDate={checkIn}
                   checkOutDate={checkOut}
+                  blockedRanges={blockedRanges}
                 />
               </div>
 
@@ -608,9 +635,23 @@ interface CalendarViewProps {
   onDateSelect: (date: Date) => void;
   checkInDate: Date | null;
   checkOutDate: Date | null;
+  blockedRanges?: Array<{ startDate: string; endDate: string }>;
 }
 
-function CalendarView({ selectedDate, minDate, onDateSelect, checkInDate, checkOutDate }: CalendarViewProps) {
+function isDateInBlockedRange(date: Date, ranges: Array<{ startDate: string; endDate: string }>): boolean {
+  const d = new Date(date);
+  d.setHours(0, 0, 0, 0);
+  for (const r of ranges) {
+    const start = new Date(r.startDate);
+    const end = new Date(r.endDate);
+    start.setHours(0, 0, 0, 0);
+    end.setHours(0, 0, 0, 0);
+    if (d >= start && d < end) return true;
+  }
+  return false;
+}
+
+function CalendarView({ selectedDate, minDate, onDateSelect, checkInDate, checkOutDate, blockedRanges = [] }: CalendarViewProps) {
   const [currentMonth, setCurrentMonth] = useState(new Date());
 
   const daysInMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0).getDate();
@@ -626,7 +667,8 @@ function CalendarView({ selectedDate, minDate, onDateSelect, checkInDate, checkO
   };
 
   const isDateDisabled = (date: Date) => {
-    return date < minDate;
+    if (date < minDate) return true;
+    return isDateInBlockedRange(date, blockedRanges);
   };
 
   const isDateInRange = (date: Date) => {
