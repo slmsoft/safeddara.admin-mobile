@@ -238,7 +238,7 @@ export function TransactionsManagement() {
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
-        <h2 className="text-xl font-bold text-gray-200">Бухгалтерия</h2>
+        <h2 className="text-xl font-bold text-white">Бухгалтерия</h2>
         <div className="flex flex-wrap items-center gap-3">
           <div className="flex items-center gap-2">
             <Calendar className="w-4 h-4 text-gray-400" />
@@ -282,7 +282,7 @@ export function TransactionsManagement() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {pieByService.length > 0 && (
           <div className="bg-[#161b2e] border border-[#1e2537] rounded-xl p-6">
-            <h3 className="text-base font-semibold text-gray-200 mb-4">Выручка по услугам</h3>
+            <h3 className="text-base font-semibold text-white mb-4">Выручка по услугам</h3>
             <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
@@ -298,7 +298,7 @@ export function TransactionsManagement() {
 
         {monthlyChartData.length > 0 && (
           <div className="bg-[#161b2e] border border-[#1e2537] rounded-xl p-6">
-            <h3 className="text-base font-semibold text-gray-200 mb-4">Выручка по месяцам</h3>
+            <h3 className="text-base font-semibold text-white mb-4">Выручка по месяцам</h3>
             <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={monthlyChartData}>
@@ -319,7 +319,7 @@ export function TransactionsManagement() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {pieByDay.length > 0 && (
           <div className="bg-[#161b2e] border border-[#1e2537] rounded-xl p-6">
-            <h3 className="text-base font-semibold text-gray-200 mb-4">По дням недели</h3>
+            <h3 className="text-base font-semibold text-white mb-4">По дням недели</h3>
             <div className="h-56">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
@@ -333,7 +333,7 @@ export function TransactionsManagement() {
           </div>
         )}
         <div className="bg-[#161b2e] border border-[#1e2537] rounded-xl p-6">
-          <h3 className="text-base font-semibold text-gray-200 mb-4">Мониторинг транзакций</h3>
+          <h3 className="text-base font-semibold text-white mb-4">Мониторинг транзакций</h3>
           <div className="space-y-2 max-h-56 overflow-y-auto">
             {filteredPayments.slice(0, 10).map(p => {
               const badge = getStatusBadge(p.status);
@@ -356,7 +356,7 @@ export function TransactionsManagement() {
       <div className="bg-[#161b2e] border border-[#1e2537] rounded-xl overflow-hidden">
         <div className="p-4 border-b border-[#1e2537]">
           <div className="flex flex-wrap items-center justify-between gap-4">
-            <h3 className="text-lg font-semibold text-gray-200">Таблица (сортировка по дате)</h3>
+            <h3 className="text-lg font-semibold text-white">Таблица (сортировка по дате)</h3>
             <div className="flex flex-wrap items-center gap-3">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />

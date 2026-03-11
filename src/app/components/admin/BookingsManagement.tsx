@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Search, ChevronLeft, ChevronRight, Maximize2, Minimize2, Plus, ListFilter } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Maximize2, Minimize2, Plus, ChevronDown } from 'lucide-react';
 import { Modal } from './Modal';
 import { adminApi, type Accommodation } from '../../../api/backendApi';
-import { format, addMonths, subMonths, startOfMonth, endOfMonth, eachDayOfInterval, startOfDay, isSameDay } from 'date-fns';
+import { format, addMonths, subMonths, startOfMonth, endOfMonth, eachDayOfInterval, startOfDay, isSameDay, startOfWeek, addDays } from 'date-fns';
 import { ru } from 'date-fns/locale';
 
 interface BookingRaw {
@@ -30,8 +30,8 @@ export function BookingsManagement() {
   const [saving, setSaving] = useState(false);
   const [selectedBooking, setSelectedBooking] = useState<BookingRaw | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [selectedRoomIds, setSelectedRoomIds] = useState<Set<string>>(new Set());
-  const [showRoomPanel, setShowRoomPanel] = useState(false);
+  const [selectedRoomId, setSelectedRoomId] = useState<string | 'all'>('all');
+  const [dropdownOpen, setDropdownOpen] = useState(false);
 
   const loadBookings = useCallback(async () => {
     setLoading(true);
@@ -79,6 +79,14 @@ export function BookingsManagement() {
     return () => document.removeEventListener('fullscreenchange', handler);
   }, []);
 
+  useEffect(() => {
+    const close = () => setDropdownOpen(false);
+    if (dropdownOpen) {
+      document.addEventListener('click', close);
+      return () => document.removeEventListener('click', close);
+    }
+  }, [dropdownOpen]);
+
   const getStatusBadge = (status: string) => {
     const s = status || 'pending';
     const badges: Record<string, { label: string; color: string }> = {
@@ -113,26 +121,18 @@ export function BookingsManagement() {
     }
   };
 
-  const getBookingsForAcc = (accId: string): BookingRaw[] =>
-    bookings.filter(b => b.accommodationId === accId);
-
-  const getBarPosition = (b: BookingRaw) => {
-    try {
-      const checkIn = startOfDay(new Date(b.checkIn));
-      const checkOut = startOfDay(new Date(b.checkOut));
-      const totalMs = monthEnd.getTime() - monthStart.getTime() + 86400000;
-      let left = (checkIn.getTime() - monthStart.getTime()) / totalMs * 100;
-      let right = (checkOut.getTime() - monthStart.getTime() + 86400000) / totalMs * 100;
-      if (left < 0) left = 0;
-      if (right > 100) right = 100;
-      return { left: Math.max(0, left), width: Math.min(100, right) - Math.max(0, left) };
-    } catch { return { left: 0, width: 0 }; }
-  };
-
   const monthStart = startOfMonth(calendarMonth);
   const monthEnd = endOfMonth(calendarMonth);
   const days = eachDayOfInterval({ start: monthStart, end: monthEnd });
-  const todayIndex = days.findIndex(d => isSameDay(d, new Date()));
+  const calStart = startOfWeek(monthStart, { weekStartsOn: 1 });
+  const calEnd = addDays(calStart, 41);
+  const calDays: (Date | null)[] = [];
+  let d = calStart;
+  while (d <= calEnd) {
+    calDays.push(d >= monthStart && d <= monthEnd ? d : null);
+    d = addDays(d, 1);
+  }
+  const weekDays = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
 
   const allAccommodations = (() => {
     const fromApi = accommodations.slice(0, 50);
@@ -146,20 +146,18 @@ export function BookingsManagement() {
     return [...fromApi, ...extra];
   })();
 
-  const displayAccommodations = selectedRoomIds.size > 0
-    ? allAccommodations.filter(a => selectedRoomIds.has(a.id))
-    : allAccommodations;
-
-  const toggleRoomSelection = (id: string) => {
-    setSelectedRoomIds(prev => {
-      const next = new Set(prev.size === 0 ? allAccommodations.map(a => a.id) : prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next.size === 0 ? new Set() : next;
-    });
+  const isDayBooked = (day: Date, accId?: string): BookingRaw | null => {
+    const dayStart = startOfDay(day);
+    const active = bookings.filter(b => b.status !== 'cancelled');
+    for (const b of accId ? active.filter(x => x.accommodationId === accId) : active) {
+      try {
+        const checkIn = startOfDay(new Date(b.checkIn));
+        const checkOut = startOfDay(new Date(b.checkOut));
+        if (dayStart >= checkIn && dayStart <= checkOut) return b;
+      } catch {}
+    }
+    return null;
   };
-
-  const selectAllRooms = () => setSelectedRoomIds(new Set());
 
   const addBookingInitial = {
     accommodationId: accommodations[0]?.id || '',
@@ -224,19 +222,29 @@ export function BookingsManagement() {
     <div id="bookings-fullscreen" className={isFullscreen ? 'fixed inset-0 z-[9999] bg-[#0d1117] overflow-auto' : 'space-y-4'}>
       <div className="flex flex-wrap items-center justify-between gap-4 p-4 border-b border-[#1e2537] bg-[#161b2e]">
         <div className="flex items-center gap-4">
-          <h2 className="text-xl font-bold text-gray-200">Календарь бронирований</h2>
-          <div className="flex items-center gap-2 text-sm">
-            <span className="text-gray-400">Всего:</span>
-            <span className="font-semibold text-gray-200">{bookings.length}</span>
-            <span className="text-green-400 font-medium">Подтв.: {confirmedCount}</span>
+          <h2 className="text-xl font-bold text-white">Календарь бронирований</h2>
+          <div className="relative">
+            <button
+              onClick={(e) => { e.stopPropagation(); setDropdownOpen(o => !o); }}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-[#0d1117] border border-[#1e2537] text-white text-sm font-medium min-w-[200px] justify-between hover:border-[#374151]"
+            >
+              {selectedRoomId === 'all' ? 'Все категории' : allAccommodations.find(a => a.id === selectedRoomId)?.title || 'Все категории'}
+              <ChevronDown className={`w-4 h-4 transition ${dropdownOpen ? 'rotate-180' : ''}`} />
+            </button>
+            {dropdownOpen && (
+              <div className="absolute top-full left-0 mt-1 w-full rounded-lg bg-[#0d1117] border border-[#1e2537] shadow-xl z-50 max-h-64 overflow-y-auto">
+                <button onClick={(e) => { e.stopPropagation(); setSelectedRoomId('all'); setDropdownOpen(false); }} className="w-full px-4 py-2.5 text-left text-white hover:bg-[#1e2537] text-sm">
+                  Все категории
+                </button>
+                {allAccommodations.map(acc => (
+                  <button key={acc.id} onClick={(e) => { e.stopPropagation(); setSelectedRoomId(acc.id); setDropdownOpen(false); }} className="w-full px-4 py-2.5 text-left text-white hover:bg-[#1e2537] text-sm">
+                    {acc.title}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
-          <button
-            onClick={() => setShowRoomPanel(p => !p)}
-            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm ${showRoomPanel ? 'bg-[#1e2537] text-gray-200' : 'bg-[#0d1117] text-gray-400 hover:text-gray-200'}`}
-            title="Выбрать номера для отображения"
-          >
-            <ListFilter className="w-4 h-4" /> Номера
-          </button>
+          <span className="text-sm text-gray-400">Подтв.: {confirmedCount}</span>
         </div>
         <div className="flex items-center gap-2">
           <button onClick={() => setIsAddModalOpen(true)} className="flex items-center gap-2 px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded-lg text-sm">
@@ -248,32 +256,12 @@ export function BookingsManagement() {
         </div>
       </div>
 
-      {showRoomPanel && (
-        <div className="p-4 bg-[#161b2e] border-b border-[#1e2537] max-h-48 overflow-y-auto">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-sm text-gray-400">Выберите номера для календаря (пусто = все)</span>
-            <button onClick={selectAllRooms} className="text-xs text-blue-400 hover:underline">Показать все</button>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {allAccommodations.map(acc => {
-              const isChecked = selectedRoomIds.size === 0 || selectedRoomIds.has(acc.id);
-              return (
-                <label key={acc.id} className="flex items-center gap-1.5 cursor-pointer px-2 py-1 rounded bg-[#0d1117] hover:bg-[#1e2537]">
-                  <input type="checkbox" checked={isChecked} onChange={() => toggleRoomSelection(acc.id)} className="rounded border-gray-500" />
-                  <span className="text-sm text-gray-300">{acc.title}</span>
-                </label>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
       <div className="p-4">
         <div className="flex items-center justify-between mb-4">
           <button onClick={() => setCalendarMonth(m => subMonths(m, 1))} className="p-2 hover:bg-[#1e2537] rounded-lg">
             <ChevronLeft className="w-6 h-6 text-gray-400" />
           </button>
-          <h3 className="text-xl font-semibold text-gray-200 capitalize">
+          <h3 className="text-xl font-semibold text-white capitalize">
             {format(calendarMonth, 'LLLL yyyy', { locale: ru })}
           </h3>
           <button onClick={() => setCalendarMonth(m => addMonths(m, 1))} className="p-2 hover:bg-[#1e2537] rounded-lg">
@@ -281,81 +269,53 @@ export function BookingsManagement() {
           </button>
         </div>
 
-        <div className="overflow-x-auto rounded-xl border border-[#1e2537] bg-[#161b2e]" style={{ minWidth: Math.max(800, days.length * 40) }}>
-          <table className="w-full border-collapse">
-            <thead>
-              <tr>
-                <th className="p-2 text-left text-xs font-semibold text-gray-400 uppercase w-28 sticky left-0 bg-[#0d1117] z-20 border-r border-b border-[#1e2537]">Номера</th>
-                <th className="border-b border-[#1e2537] p-0">
-                  <div className="flex" style={{ width: days.length * 40 }}>
-                    {days.map(d => (
-                      <div key={d.toISOString()} className="flex-1 min-w-[40px] p-1 text-center text-[10px] font-semibold text-gray-400 border-r border-[#1e2537]/60">
-                        <div>{format(d, 'EEE', { locale: ru })}</div>
-                        <div className="text-gray-300">{format(d, 'd')}</div>
+        <div className="rounded-xl border border-[#1e2537] bg-[#161b2e] overflow-hidden">
+          <div className="grid grid-cols-7">
+            {weekDays.map(w => (
+              <div key={w} className="p-2 text-center text-xs font-semibold text-gray-400 border-b border-r border-[#1e2537] last:border-r-0">
+                {w}
+              </div>
+            ))}
+            {calDays.map((day, i) => {
+              const isToday = day && isSameDay(day, new Date());
+              const booking = day ? isDayBooked(day, selectedRoomId === 'all' ? undefined : selectedRoomId) : null;
+              const isCurrentMonth = day && day >= monthStart && day <= monthEnd;
+              return (
+                <div
+                  key={i}
+                  className={`min-h-[72px] p-1.5 border-b border-r border-[#1e2537]/60 last:border-r-0 flex flex-col relative ${!isCurrentMonth ? 'bg-[#0d1117]/50' : ''}`}
+                >
+                  {day && (
+                    <>
+                      <div className="flex items-center gap-1">
+                        <span className={`text-xs ${isCurrentMonth ? 'text-white' : 'text-gray-500'}`}>{format(day, 'd')}</span>
+                        {isToday && <span className="w-1.5 h-1.5 rounded-full bg-red-500 flex-shrink-0" />}
                       </div>
-                    ))}
-                  </div>
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {displayAccommodations.length === 0 ? (
-                <tr><td colSpan={2} className="p-12 text-center text-gray-400">Нет номеров</td></tr>
-              ) : (
-                displayAccommodations.map((acc) => {
-                  const accBookings = getBookingsForAcc(acc.id).filter(b => {
-                    try {
-                      const cOut = new Date(b.checkOut);
-                      return cOut >= monthStart;
-                    } catch { return true; }
-                  });
-                  return (
-                    <tr key={acc.id} className="border-t border-[#1e2537]">
-                      <td className="py-1.5 px-3 text-sm text-gray-300 sticky left-0 bg-[#161b2e] z-10 border-r border-[#1e2537] font-medium">{acc.title}</td>
-                      <td className="p-0 align-middle">
-                        <div className="relative h-9" style={{ width: days.length * 40 }}>
-                          <div className="absolute inset-0 flex bg-[#0d1117]/20">
-                            {days.map(d => (
-                              <div key={d.toISOString()} className="flex-1 min-w-[40px] border-r border-[#1e2537]/30" />
-                            ))}
-                          </div>
-                          {todayIndex >= 0 && (
-                            <div className="absolute top-0 bottom-0 w-0.5 bg-red-500 z-10 pointer-events-none" style={{ left: `${((todayIndex + 0.5) / days.length) * 100}%`, marginLeft: -1 }} />
-                          )}
-                          {accBookings.map((b) => {
-                            const pos = getBarPosition(b);
-                            if (pos.width <= 0) return null;
-                            const statusColors: Record<string, string> = {
-                              confirmed: 'bg-green-600 hover:bg-green-500',
-                              cancelled: 'bg-red-600 hover:bg-red-500',
-                              pending: 'bg-amber-500 hover:bg-amber-400',
-                              pending_payment: 'bg-amber-500 hover:bg-amber-400',
-                            };
-                            const color = statusColors[b.status] || 'bg-amber-500 hover:bg-amber-400';
-                            const tooltip = `${b.guestName}${b.guestPhone ? ` · ${b.guestPhone}` : ''} · ${formatDisplayDate(b.checkIn)}–${formatDisplayDate(b.checkOut)}`;
-                            return (
-                              <div
-                                key={b.id}
-                                className={`absolute top-0.5 bottom-0.5 rounded cursor-pointer ${color} flex items-center px-1 min-w-0 overflow-hidden text-white text-[10px] font-medium transition-colors`}
-                                style={{ left: `${pos.left}%`, width: `${pos.width}%` }}
-                                onClick={() => setSelectedBooking(b)}
-                                title={tooltip}
-                              >
-                                <span className="truncate">{b.guestName}</span>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-          {accommodations.length > 30 && (
-            <p className="p-3 text-center text-sm text-gray-500">Показано до 30 номеров</p>
-          )}
+                      <div className="flex-1 flex items-center justify-center mt-1">
+                        {!isCurrentMonth ? null : booking ? (
+                          <button
+                            onClick={() => setSelectedBooking(booking)}
+                            className={`w-full py-1 px-1 rounded text-[10px] font-medium text-white truncate cursor-pointer ${
+                              booking.status === 'confirmed' ? 'bg-green-600 hover:bg-green-500' :
+                              booking.status === 'cancelled' ? 'bg-red-600 hover:bg-red-500' :
+                              'bg-amber-500 hover:bg-amber-400'
+                            }`}
+                            title={`${booking.guestName} · ${formatDisplayDate(booking.checkIn)}–${formatDisplayDate(booking.checkOut)}`}
+                          >
+                            {booking.guestName}
+                          </button>
+                        ) : (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded bg-green-600/80 text-white text-[10px] font-medium">
+                            Доступно
+                          </span>
+                        )}
+                      </div>
+                    </>
+                  )}
+                </div>
+              );
+            })}
+          </div>
         </div>
       </div>
 
