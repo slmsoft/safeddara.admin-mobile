@@ -289,7 +289,7 @@ export function TransactionsManagement() {
                   <Pie data={pieByService} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} label={CustomPieLabel} labelLine={false}>
                     {pieByService.map((_, i) => <Cell key={i} fill={pieByService[i].fill} stroke="#1e2537" strokeWidth={2} />)}
                   </Pie>
-                  <Tooltip contentStyle={{ backgroundColor: '#0d1117', border: '1px solid #1e2537', color: '#e5e7eb' }} formatter={(v: number) => [`${v.toLocaleString()} смн`, 'Сумма']} />
+                  <Tooltip contentStyle={{ backgroundColor: '#ffffff', border: '1px solid #e5e7eb', color: '#111827' }} formatter={(v: number) => [`${v.toLocaleString()} смн`, 'Сумма']} />
                 </PieChart>
               </ResponsiveContainer>
             </div>
@@ -305,7 +305,7 @@ export function TransactionsManagement() {
                   <CartesianGrid strokeDasharray="3 3" stroke="#1e2537" />
                   <XAxis dataKey="name" stroke="#94a3b8" fontSize={12} tick={{ fill: '#e2e8f0' }} />
                   <YAxis stroke="#94a3b8" fontSize={12} tick={{ fill: '#e2e8f0' }} tickFormatter={(v) => `${v}`} />
-                  <Tooltip contentStyle={{ backgroundColor: '#0d1117', border: '1px solid #1e2537', color: '#e5e7eb' }} />
+                  <Tooltip contentStyle={{ backgroundColor: '#ffffff', border: '1px solid #e5e7eb', color: '#111827' }} />
                   <Bar dataKey="value" fill="#22c55e" name="Смн" radius={[4, 4, 0, 0]}>
                     <LabelList dataKey="value" position="top" fill="#e2e8f0" fontSize={11} formatter={(v: number) => v.toLocaleString()} />
                   </Bar>
@@ -326,7 +326,7 @@ export function TransactionsManagement() {
                   <Pie data={pieByDay} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={50} outerRadius={70} label={CustomPieLabel} labelLine={false}>
                     {pieByDay.map((_, i) => <Cell key={i} fill={pieByDay[i].fill} stroke="#1e2537" strokeWidth={2} />)}
                   </Pie>
-                  <Tooltip contentStyle={{ backgroundColor: '#0d1117', border: '1px solid #1e2537', color: '#e5e7eb' }} formatter={(v: number) => [`${v.toLocaleString()} смн`, '']} />
+                  <Tooltip contentStyle={{ backgroundColor: '#ffffff', border: '1px solid #e5e7eb', color: '#111827' }} formatter={(v: number) => [`${v.toLocaleString()} смн`, '']} />
                 </PieChart>
               </ResponsiveContainer>
             </div>

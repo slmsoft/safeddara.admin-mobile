@@ -296,19 +296,14 @@ export function BookingsManagement() {
                           <button
                             onClick={() => setSelectedBooking(booking)}
                             className={`w-full py-1 px-1 rounded text-[10px] font-medium text-white truncate cursor-pointer ${
-                              booking.status === 'confirmed' ? 'bg-green-600 hover:bg-green-500' :
                               booking.status === 'cancelled' ? 'bg-red-600 hover:bg-red-500' :
-                              'bg-amber-500 hover:bg-amber-400'
+                              'bg-green-600 hover:bg-green-500'
                             }`}
                             title={`${booking.guestName} · ${formatDisplayDate(booking.checkIn)}–${formatDisplayDate(booking.checkOut)}`}
                           >
                             {booking.guestName}
                           </button>
-                        ) : (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded bg-green-600/80 text-white text-[10px] font-medium">
-                            Доступно
-                          </span>
-                        )}
+                        ) : null}
                       </div>
                     </>
                   )}
@@ -321,24 +316,24 @@ export function BookingsManagement() {
 
       {selectedBooking && (
         <Modal isOpen={!!selectedBooking} onClose={() => setSelectedBooking(null)} title={`Бронирование #${selectedBooking.id.slice(0, 8)}`} size="lg">
-          <div className="space-y-4">
+          <div className="space-y-4 p-4 bg-white rounded-xl">
             <div className="flex items-center justify-between flex-wrap gap-3">
-              <span className="text-gray-400 text-sm">{selectedBooking.room}</span>
+              <span className="text-gray-600 text-sm">{selectedBooking.room}</span>
               <span className={`inline-flex px-3 py-1 rounded-full text-sm font-medium border ${getStatusBadge(selectedBooking.status).color}`}>
                 {getStatusBadge(selectedBooking.status).label}
               </span>
-              <span className="text-xl font-bold text-emerald-400">{selectedBooking.total?.toLocale?.() ?? selectedBooking.total} смн</span>
+              <span className="text-xl font-bold text-emerald-600">{selectedBooking.total?.toLocale?.() ?? selectedBooking.total} смн</span>
             </div>
-            <div className="grid grid-cols-2 gap-3 text-sm">
-              <div><span className="text-gray-500">Гость:</span> <span className="text-gray-200 font-medium">{selectedBooking.guestName}</span></div>
-              <div><span className="text-gray-500">Email:</span> <span className="text-gray-200">{selectedBooking.guestEmail}</span></div>
-              <div><span className="text-gray-500">Телефон:</span> <span className="text-gray-200">{selectedBooking.guestPhone || '—'}</span></div>
-              <div><span className="text-gray-500">Номер:</span> <span className="text-gray-200">{selectedBooking.room}</span></div>
-              <div><span className="text-gray-500">Гостей:</span> <span className="text-gray-200">{selectedBooking.guests}</span></div>
+            <div className="grid grid-cols-2 gap-3 text-sm text-gray-900">
+              <div><span className="text-gray-600">Гость:</span> <span className="font-medium">{selectedBooking.guestName}</span></div>
+              <div><span className="text-gray-600">Email:</span> <span>{selectedBooking.guestEmail}</span></div>
+              <div><span className="text-gray-600">Телефон:</span> <span>{selectedBooking.guestPhone || '—'}</span></div>
+              <div><span className="text-gray-600">Номер:</span> <span>{selectedBooking.room}</span></div>
+              <div><span className="text-gray-600">Гостей:</span> <span>{selectedBooking.guests}</span></div>
             </div>
-            <div className="p-4 bg-amber-500/10 border border-amber-500/30 rounded-lg">
-              <span className="text-gray-500 text-sm">Период: </span>
-              <span className="text-amber-200 font-semibold">{formatDisplayDate(selectedBooking.checkIn)} — {formatDisplayDate(selectedBooking.checkOut)}</span>
+            <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg">
+              <span className="text-gray-600 text-sm">Период: </span>
+              <span className="text-amber-800 font-semibold">{formatDisplayDate(selectedBooking.checkIn)} — {formatDisplayDate(selectedBooking.checkOut)}</span>
             </div>
             <div className="flex justify-end gap-3 pt-2">
               <button onClick={() => setSelectedBooking(null)} className="px-4 py-2 bg-[#161b2e] border border-[#1e2537] text-gray-300 rounded-lg hover:bg-[#1e2537]">Закрыть</button>
