@@ -28,10 +28,29 @@ interface AdminUser {
   role: UserRole;
 }
 
+const VALID_PAGES = ['dashboard', 'bookings', 'admins', 'users', 'hotels', 'transactions', 'news', 'orders', 'feedback', 'events', 'services', 'restaurant', 'cameras', 'rules', 'about', 'settings'];
+
 export function AdminApp() {
   const [currentUser, setCurrentUser] = useState<AdminUser | null>(null);
   const [currentPage, setCurrentPage] = useState('dashboard');
   const [authChecking, setAuthChecking] = useState(true);
+
+  useEffect(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const p = params.get('page');
+      if (p && VALID_PAGES.includes(p)) setCurrentPage(p);
+    } catch {}
+  }, []);
+
+  const handleNavigate = (page: string) => {
+    setCurrentPage(page);
+    try {
+      const url = new URL(window.location.href);
+      url.searchParams.set('page', page);
+      window.history.replaceState(null, '', url.pathname + url.search + url.hash);
+    } catch {}
+  };
 
   useEffect(() => {
     const token = getAdminToken();
@@ -222,7 +241,7 @@ export function AdminApp() {
   return (
     <AdminLayout
       currentPage={currentPage}
-      onNavigate={setCurrentPage}
+      onNavigate={handleNavigate}
       userRole={currentUser.role}
       username={currentUser.username}
       onLogout={handleLogout}

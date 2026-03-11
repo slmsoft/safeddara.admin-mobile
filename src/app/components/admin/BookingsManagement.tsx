@@ -1,5 +1,6 @@
-import { useState, useEffect, useCallback } from 'react';
-import { ChevronLeft, ChevronRight, Maximize2, Minimize2, Plus, ChevronDown } from 'lucide-react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { ChevronLeft, ChevronRight, Maximize2, Minimize2, Plus, ChevronDown, Bell } from 'lucide-react';
+import { toast } from 'sonner';
 import { Modal } from './Modal';
 import { adminApi, type Accommodation } from '../../../api/backendApi';
 import { format, addMonths, subMonths, startOfMonth, endOfMonth, eachDayOfInterval, startOfDay, isSameDay, startOfWeek, addDays } from 'date-fns';
@@ -32,6 +33,7 @@ export function BookingsManagement() {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [selectedRoomId, setSelectedRoomId] = useState<string | 'all'>('all');
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const notifiedIds = useRef<Set<string>>(new Set());
 
   const loadBookings = useCallback(async () => {
     setLoading(true);
@@ -87,6 +89,52 @@ export function BookingsManagement() {
     }
   }, [dropdownOpen]);
 
+  useEffect(() => {
+    if (selectedBooking) {
+      try {
+        const hash = `#booking=${selectedBooking.id}`;
+        if (window.location.hash !== hash) window.history.replaceState(null, '', `${window.location.pathname || ''}${window.location.search || ''}${hash}`);
+      } catch {}
+    } else {
+      if (window.location.hash?.startsWith('#booking=')) window.history.replaceState(null, '', (window.location.pathname || '') + (window.location.search || ''));
+    }
+  }, [selectedBooking?.id]);
+
+  useEffect(() => {
+    const m = () => {
+      try {
+        const match = window.location.hash?.match(/#booking=([a-f0-9-]+)/i);
+        if (match && bookings.length > 0) {
+          const b = bookings.find(x => x.id === match[1] || x.id.startsWith(match[1]));
+          if (b && !selectedBooking) setSelectedBooking(b);
+        }
+      } catch {}
+    };
+    m();
+    window.addEventListener('hashchange', m);
+    return () => window.removeEventListener('hashchange', m);
+  }, [bookings, selectedBooking?.id]);
+
+  useEffect(() => {
+    const THIRTY_MIN = 30 * 60 * 1000;
+    const check = () => {
+      const now = Date.now();
+      bookings.filter(b => b.status === 'confirmed').forEach(b => {
+        try {
+          const end = new Date(b.checkOut).setHours(12, 0, 0, 0);
+          const diff = end - now;
+          if (diff > 0 && diff <= THIRTY_MIN && !notifiedIds.current.has(b.id)) {
+            notifiedIds.current.add(b.id);
+            toast(`Бронирование #${b.id.slice(0, 8)} (${b.guestName}) заканчивается через 30 минут`, { icon: <Bell className="w-4 h-4" />, duration: 10000 });
+          }
+        } catch {}
+      });
+    };
+    const id = setInterval(check, 60000);
+    check();
+    return () => clearInterval(id);
+  }, [bookings]);
+
   const getStatusBadge = (status: string) => {
     const s = status || 'pending';
     const badges: Record<string, { label: string; color: string }> = {
@@ -111,7 +159,10 @@ export function BookingsManagement() {
     if (!editingBooking) return;
     setSaving(true);
     try {
-      await adminApi.bookings.update(editingBooking.id, { status: editingBooking.status });
+      await adminApi.bookings.update(editingBooking.id, {
+        status: editingBooking.status,
+        guestPhone: editingBooking.guestPhone?.trim() || undefined,
+      });
       await loadBookings();
       setIsModalOpen(false);
     } catch (e) {
@@ -316,27 +367,31 @@ export function BookingsManagement() {
 
       {selectedBooking && (
         <Modal isOpen={!!selectedBooking} onClose={() => setSelectedBooking(null)} title={`Бронирование #${selectedBooking.id.slice(0, 8)}`} size="lg">
-          <div className="space-y-4 p-4 bg-white rounded-xl">
+          <div className="space-y-4 p-4 bg-[#161b2e] rounded-xl border border-[#1e2537]">
             <div className="flex items-center justify-between flex-wrap gap-3">
-              <span className="text-gray-600 text-sm">{selectedBooking.room}</span>
+              <span className="text-gray-400 text-sm">{selectedBooking.room}</span>
               <span className={`inline-flex px-3 py-1 rounded-full text-sm font-medium border ${getStatusBadge(selectedBooking.status).color}`}>
                 {getStatusBadge(selectedBooking.status).label}
               </span>
-              <span className="text-xl font-bold text-emerald-600">{selectedBooking.total?.toLocale?.() ?? selectedBooking.total} смн</span>
+              <span className="text-xl font-bold text-emerald-400">{selectedBooking.total?.toLocale?.() ?? selectedBooking.total} смн</span>
             </div>
-            <div className="grid grid-cols-2 gap-3 text-sm text-gray-900">
-              <div><span className="text-gray-600">Гость:</span> <span className="font-medium">{selectedBooking.guestName}</span></div>
-              <div><span className="text-gray-600">Email:</span> <span>{selectedBooking.guestEmail}</span></div>
-              <div><span className="text-gray-600">Телефон:</span> <span>{selectedBooking.guestPhone || '—'}</span></div>
-              <div><span className="text-gray-600">Номер:</span> <span>{selectedBooking.room}</span></div>
-              <div><span className="text-gray-600">Гостей:</span> <span>{selectedBooking.guests}</span></div>
+            <div className="grid grid-cols-2 gap-3 text-sm text-gray-200">
+              <div><span className="text-gray-400">Гость:</span> <span className="font-medium">{selectedBooking.guestName}</span></div>
+              <div><span className="text-gray-400">Email:</span> <span>{selectedBooking.guestEmail}</span></div>
+              <div><span className="text-gray-400">Телефон:</span> <span>{selectedBooking.guestPhone || '—'}</span></div>
+              <div><span className="text-gray-400">Номер:</span> <span>{selectedBooking.room}</span></div>
+              <div><span className="text-gray-400">Гостей:</span> <span>{selectedBooking.guests}</span></div>
             </div>
-            <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg">
-              <span className="text-gray-600 text-sm">Период: </span>
-              <span className="text-amber-800 font-semibold">{formatDisplayDate(selectedBooking.checkIn)} — {formatDisplayDate(selectedBooking.checkOut)}</span>
+            <div className="p-4 bg-amber-950/30 border border-amber-700/40 rounded-lg">
+              <div className="text-gray-300 text-sm">
+                <span className="text-gray-400">Период:</span> <span className="text-amber-300 font-semibold">{formatDisplayDate(selectedBooking.checkIn)} — {formatDisplayDate(selectedBooking.checkOut)}</span>
+              </div>
+              <div className="text-gray-400 text-sm mt-1">
+                <span className="text-gray-500">Время заселения:</span> <span className="text-gray-200">14:00</span>
+              </div>
             </div>
             <div className="flex justify-end gap-3 pt-2">
-              <button onClick={() => setSelectedBooking(null)} className="px-4 py-2 bg-[#161b2e] border border-[#1e2537] text-gray-300 rounded-lg hover:bg-[#1e2537]">Закрыть</button>
+              <button onClick={() => setSelectedBooking(null)} className="px-4 py-2 bg-[#0d1117] border border-[#1e2537] text-gray-300 rounded-lg hover:bg-[#1e2537]">Закрыть</button>
               <button onClick={() => { handleEditBooking(selectedBooking); setSelectedBooking(null); }} className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg">Редактировать</button>
             </div>
           </div>
@@ -349,6 +404,16 @@ export function BookingsManagement() {
             <div><p className="text-xs text-gray-400 mb-1">Гость</p><p className="text-gray-200">{editingBooking.guestName} ({editingBooking.guestEmail})</p></div>
             <div><p className="text-xs text-gray-400 mb-1">Номер</p><p className="text-gray-200">{editingBooking.room}</p></div>
             <div><p className="text-xs text-gray-400 mb-1">Даты</p><p className="text-gray-200">{formatDisplayDate(editingBooking.checkIn)} — {formatDisplayDate(editingBooking.checkOut)}</p></div>
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">Телефон гостя</label>
+              <input
+                type="tel"
+                value={editingBooking.guestPhone || ''}
+                onChange={(e) => setEditingBooking({ ...editingBooking, guestPhone: e.target.value })}
+                placeholder="+992 XX XXX XX XX"
+                className="w-full bg-[#0d1117] border border-[#1e2537] rounded-lg px-4 py-2 text-gray-200 placeholder:text-gray-500"
+              />
+            </div>
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-2">Статус</label>
               <select value={editingBooking.status} onChange={(e) => setEditingBooking({ ...editingBooking, status: e.target.value })} className="w-full bg-[#0d1117] border border-[#1e2537] rounded-lg px-4 py-2 text-gray-200">

@@ -248,7 +248,7 @@ export const adminApi = {
     list: () => adminFetch<{ bookings: Array<{ id: string; guestName: string; guestEmail: string; accommodation: { id?: string; title: string }; checkIn: string; checkOut: string; guests: number; totalPrice: number; status: string }> }>('/bookings'),
     create: (body: { accommodationId: string; checkIn: string; checkOut: string; guests: number; guestName: string; guestEmail: string }) =>
       adminFetch<{ booking: unknown }>('/bookings', { method: 'POST', body: JSON.stringify(body) }),
-    update: (id: string, body: { status?: string }) =>
+    update: (id: string, body: { status?: string; guestPhone?: string }) =>
       adminFetch<{ booking: unknown }>(`/bookings/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
   },
   payments: {
