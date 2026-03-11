@@ -33,6 +33,10 @@ Username: slmtech
 Password: SLM@tech123
 
 ---
+Backend: исправление 401 для POST /admin/bookings — см. docs/BACKEND_FIX_POST_BOOKINGS_401.md
+(OPTIONS preflight должен не проходить через adminAuth)
+
+---
 API debugging (2api.safeddara.tj)
 
 GET accommodations:

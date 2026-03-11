@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Search, Calendar, CheckCircle, XCircle, Clock, Edit2, Plus, ChevronLeft, ChevronRight, CalendarDays, List } from 'lucide-react';
+import { Search, Calendar, CheckCircle, XCircle, Clock, Edit2, Plus, ChevronLeft, ChevronRight, Maximize2, Minimize2 } from 'lucide-react';
 import { Modal } from './Modal';
 import { adminApi, type Accommodation } from '../../../api/backendApi';
-import { format, addMonths, subMonths, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isWithinInterval, startOfDay } from 'date-fns';
+import { format, addMonths, subMonths, startOfMonth, endOfMonth, eachDayOfInterval, startOfDay, isSameDay } from 'date-fns';
 import { ru } from 'date-fns/locale';
 
 interface BookingRaw {
@@ -21,16 +21,14 @@ interface BookingRaw {
 export function BookingsManagement() {
   const [bookings, setBookings] = useState<BookingRaw[]>([]);
   const [accommodations, setAccommodations] = useState<Accommodation[]>([]);
-  const [viewMode, setViewMode] = useState<'table' | 'calendar'>('calendar');
   const [calendarMonth, setCalendarMonth] = useState(new Date());
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedStatus, setSelectedStatus] = useState('all');
   const [loading, setLoading] = useState(true);
   const [editingBooking, setEditingBooking] = useState<BookingRaw | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [selectedDayBooking, setSelectedDayBooking] = useState<BookingRaw | null>(null);
+  const [selectedBooking, setSelectedBooking] = useState<BookingRaw | null>(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
   const loadBookings = useCallback(async () => {
     setLoading(true);
@@ -71,38 +69,25 @@ export function BookingsManagement() {
     loadBookings();
   }, [loadBookings]);
 
-  const filteredBookings = bookings.filter(b => {
-    const matchSearch = b.guestName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      b.guestEmail.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      b.room.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchStatus = selectedStatus === 'all' || b.status === selectedStatus;
-    return matchSearch && matchStatus;
-  });
-
-  const statusMap: Record<string, string> = {
-    pending: 'Ожидание',
-    pending_payment: 'Ожидание оплаты',
-    confirmed: 'Подтверждено',
-    cancelled: 'Отменено',
-  };
+  useEffect(() => {
+    const handler = () => { if (document.fullscreenElement) setIsFullscreen(true); else setIsFullscreen(false); };
+    document.addEventListener('fullscreenchange', handler);
+    return () => document.removeEventListener('fullscreenchange', handler);
+  }, []);
 
   const getStatusBadge = (status: string) => {
     const s = status || 'pending';
     const badges: Record<string, { label: string; color: string }> = {
       confirmed: { label: 'Подтверждено', color: 'bg-green-500/20 text-green-400 border-green-500/30' },
       pending: { label: 'Ожидание', color: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30' },
-      pending_payment: { label: 'Ожидание оплаты', color: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30' },
+      pending_payment: { label: 'Ожидание оплаты', color: 'bg-amber-500/20 text-amber-400 border-amber-500/30' },
       cancelled: { label: 'Отменено', color: 'bg-red-500/20 text-red-400 border-red-500/30' },
     };
     return badges[s] || badges.pending;
   };
 
   const formatDisplayDate = (d: string) => {
-    try {
-      return new Date(d).toLocaleDateString('ru-RU');
-    } catch {
-      return d;
-    }
+    try { return new Date(d).toLocaleDateString('ru-RU'); } catch { return d; }
   };
 
   const handleEditBooking = (b: BookingRaw) => {
@@ -124,27 +109,38 @@ export function BookingsManagement() {
     }
   };
 
-  const isDayBooked = (day: Date, accId: string): BookingRaw | null => {
-    const dayStart = startOfDay(day);
-    for (const b of bookings) {
-      if (b.accommodationId !== accId || b.status === 'cancelled') continue;
-      try {
-        const checkIn = startOfDay(new Date(b.checkIn));
-        const checkOut = startOfDay(new Date(b.checkOut));
-        if (isWithinInterval(dayStart, { start: checkIn, end: checkOut }) || isSameDay(dayStart, checkIn) || isSameDay(dayStart, checkOut)) {
-          return b;
-        }
-      } catch {}
-    }
-    return null;
+  const getBookingsForAcc = (accId: string): BookingRaw[] =>
+    bookings.filter(b => b.accommodationId === accId && b.status !== 'cancelled');
+
+  const getBarPosition = (b: BookingRaw) => {
+    try {
+      const checkIn = startOfDay(new Date(b.checkIn));
+      const checkOut = startOfDay(new Date(b.checkOut));
+      const totalMs = monthEnd.getTime() - monthStart.getTime() + 86400000;
+      let left = (checkIn.getTime() - monthStart.getTime()) / totalMs * 100;
+      let right = (checkOut.getTime() - monthStart.getTime() + 86400000) / totalMs * 100;
+      if (left < 0) left = 0;
+      if (right > 100) right = 100;
+      return { left: Math.max(0, left), width: Math.min(100, right) - Math.max(0, left) };
+    } catch { return { left: 0, width: 0 }; }
   };
 
   const monthStart = startOfMonth(calendarMonth);
   const monthEnd = endOfMonth(calendarMonth);
   const days = eachDayOfInterval({ start: monthStart, end: monthEnd });
-  const dayNames = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
+  const todayIndex = days.findIndex(d => isSameDay(d, new Date()));
 
-  const statuses = ['all', ...Array.from(new Set(bookings.map(b => b.status)))];
+  const displayAccommodations = (() => {
+    const fromApi = accommodations.slice(0, 30);
+    const bookedIds = new Set(bookings.filter(b => b.status !== 'cancelled').map(b => b.accommodationId));
+    const missing = [...bookedIds].filter(id => !fromApi.some(a => a.id === id));
+    if (missing.length === 0) return fromApi;
+    const extra = missing.map(id => {
+      const b = bookings.find(x => x.accommodationId === id);
+      return { id, title: b?.room || id };
+    });
+    return [...fromApi, ...extra];
+  })();
 
   const addBookingInitial = {
     accommodationId: accommodations[0]?.id || '',
@@ -185,6 +181,16 @@ export function BookingsManagement() {
     }
   };
 
+  const toggleFullscreen = () => {
+    const el = document.getElementById('bookings-fullscreen');
+    if (!el) return;
+    if (!document.fullscreenElement) {
+      el.requestFullscreen?.();
+    } else {
+      document.exitFullscreen?.();
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
@@ -193,186 +199,151 @@ export function BookingsManagement() {
     );
   }
 
+  const confirmedCount = bookings.filter(b => b.status === 'confirmed').length;
+
   return (
-    <div className="space-y-6">
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <div className="bg-[#161b2e] border border-[#1e2537] rounded-xl p-4">
-          <div className="flex items-center gap-2 mb-2"><Calendar className="w-5 h-5 text-blue-400" /></div>
-          <p className="text-gray-400 text-xs mb-1">Всего</p>
-          <p className="text-2xl font-bold text-gray-200">{bookings.length}</p>
+    <div id="bookings-fullscreen" className={isFullscreen ? 'fixed inset-0 z-[9999] bg-[#0d1117] overflow-auto' : 'space-y-4'}>
+      <div className="flex flex-wrap items-center justify-between gap-4 p-4 border-b border-[#1e2537] bg-[#161b2e]">
+        <div className="flex items-center gap-4">
+          <h2 className="text-xl font-bold text-gray-200">Календарь бронирований</h2>
+          <div className="flex items-center gap-2 text-sm">
+            <span className="text-gray-400">Всего:</span>
+            <span className="font-semibold text-gray-200">{bookings.length}</span>
+            <span className="text-green-400 font-medium">Подтверждено: {confirmedCount}</span>
+          </div>
         </div>
-        <div className="bg-[#161b2e] border border-[#1e2537] rounded-xl p-4">
-          <div className="flex items-center gap-2 mb-2"><CheckCircle className="w-5 h-5 text-green-400" /></div>
-          <p className="text-gray-400 text-xs mb-1">Подтверждено</p>
-          <p className="text-2xl font-bold text-green-400">{bookings.filter(b => b.status === 'confirmed').length}</p>
-        </div>
-        <div className="bg-[#161b2e] border border-[#1e2537] rounded-xl p-4">
-          <div className="flex items-center gap-2 mb-2"><Clock className="w-5 h-5 text-yellow-400" /></div>
-          <p className="text-gray-400 text-xs mb-1">Ожидание</p>
-          <p className="text-2xl font-bold text-yellow-400">{bookings.filter(b => ['pending', 'pending_payment'].includes(b.status)).length}</p>
-        </div>
-        <div className="bg-[#161b2e] border border-[#1e2537] rounded-xl p-4">
-          <div className="flex items-center gap-2 mb-2"><XCircle className="w-5 h-5 text-red-400" /></div>
-          <p className="text-gray-400 text-xs mb-1">Отменено</p>
-          <p className="text-2xl font-bold text-red-400">{bookings.filter(b => b.status === 'cancelled').length}</p>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setIsAddModalOpen(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded-lg text-sm"
+          >
+            <Plus className="w-4 h-4" /> Добавить
+          </button>
+          <button
+            onClick={toggleFullscreen}
+            className="p-2 hover:bg-[#1e2537] rounded-lg text-gray-400 hover:text-gray-200"
+            title={isFullscreen ? 'Выйти из полноэкранного режима' : 'Полный экран'}
+          >
+            {isFullscreen ? <Minimize2 className="w-5 h-5" /> : <Maximize2 className="w-5 h-5" />}
+          </button>
         </div>
       </div>
 
-      <div className="bg-[#161b2e] border border-[#1e2537] rounded-xl overflow-hidden">
-        <div className="p-4 sm:p-6 border-b border-[#1e2537]">
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setViewMode('calendar')}
-                className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm ${viewMode === 'calendar' ? 'bg-blue-500/30 text-blue-400' : 'text-gray-400 hover:bg-[#1e2537]'}`}
-              >
-                <CalendarDays className="w-4 h-4" /> Календарь
-              </button>
-              <button
-                onClick={() => setViewMode('table')}
-                className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm ${viewMode === 'table' ? 'bg-blue-500/30 text-blue-400' : 'text-gray-400 hover:bg-[#1e2537]'}`}
-              >
-                <List className="w-4 h-4" /> Таблица
-              </button>
-            </div>
-            <div className="flex flex-wrap items-center gap-3">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                <input type="text" placeholder="Поиск..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-48 sm:w-64 bg-[#0d1117] border border-[#1e2537] rounded-lg pl-10 pr-4 py-2 text-sm text-gray-300" />
-              </div>
-              <select value={selectedStatus} onChange={(e) => setSelectedStatus(e.target.value)} className="bg-[#0d1117] border border-[#1e2537] rounded-lg px-4 py-2 text-sm text-gray-300">
-                <option value="all">Все статусы</option>
-                {statuses.filter(s => s !== 'all').map(s => (
-                  <option key={s} value={s}>{statusMap[s] || s}</option>
-                ))}
-              </select>
-              <button
-                onClick={() => setIsAddModalOpen(true)}
-                className="flex items-center gap-2 px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded-lg text-sm"
-              >
-                <Plus className="w-4 h-4" /> Добавить
-              </button>
-            </div>
-          </div>
+      <div className="p-4">
+        <div className="flex items-center justify-between mb-4">
+          <button onClick={() => setCalendarMonth(m => subMonths(m, 1))} className="p-2 hover:bg-[#1e2537] rounded-lg">
+            <ChevronLeft className="w-6 h-6 text-gray-400" />
+          </button>
+          <h3 className="text-xl font-semibold text-gray-200 capitalize">
+            {format(calendarMonth, 'LLLL yyyy', { locale: ru })}
+          </h3>
+          <button onClick={() => setCalendarMonth(m => addMonths(m, 1))} className="p-2 hover:bg-[#1e2537] rounded-lg">
+            <ChevronRight className="w-6 h-6 text-gray-400" />
+          </button>
         </div>
 
-        {viewMode === 'calendar' && (
-          <div className="p-4 sm:p-6 overflow-x-auto">
-            <div className="flex items-center justify-between mb-6">
-              <button onClick={() => setCalendarMonth(m => subMonths(m, 1))} className="p-2 hover:bg-[#1e2537] rounded-lg">
-                <ChevronLeft className="w-5 h-5 text-gray-400" />
-              </button>
-              <h3 className="text-lg font-semibold text-gray-200 capitalize">
-                {format(calendarMonth, 'LLLL yyyy', { locale: ru })}
-              </h3>
-              <button onClick={() => setCalendarMonth(m => addMonths(m, 1))} className="p-2 hover:bg-[#1e2537] rounded-lg">
-                <ChevronRight className="w-5 h-5 text-gray-400" />
-              </button>
-            </div>
-
-            <div className="overflow-x-auto min-w-0">
-              <table className="w-full border-collapse" style={{ minWidth: 800 }}>
-                <thead>
-                  <tr>
-                    <th className="p-2 text-left text-xs font-semibold text-gray-400 uppercase w-32 sticky left-0 bg-[#161b2e] z-10 border-r border-[#1e2537]">Номер</th>
+        <div className="overflow-x-auto rounded-xl border border-[#1e2537] bg-[#161b2e]" style={{ minWidth: Math.max(900, days.length * 48) }}>
+          <table className="w-full border-collapse">
+            <thead>
+              <tr>
+                <th className="p-3 text-left text-xs font-semibold text-gray-400 uppercase w-36 lg:w-44 sticky left-0 bg-[#0d1117] z-20 border-r border-b border-[#1e2537]">Номера</th>
+                <th className="border-b border-[#1e2537] p-0">
+                  <div className="flex" style={{ width: days.length * 48 }}>
                     {days.map(d => (
-                      <th key={d.toISOString()} className="p-2 text-center text-xs font-semibold text-gray-400 min-w-[44px]">
-                        {format(d, 'd')}
-                      </th>
+                      <div key={d.toISOString()} className="flex-1 min-w-[48px] p-1.5 text-center text-[10px] font-semibold text-gray-400 border-r border-[#1e2537]/60">
+                        <div>{format(d, 'EEE', { locale: ru })}</div>
+                        <div className="text-gray-300">{format(d, 'd')}</div>
+                      </div>
                     ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {accommodations.length === 0 ? (
-                    <tr><td colSpan={days.length + 1} className="p-8 text-center text-gray-400">Нет номеров</td></tr>
-                  ) : (
-                    accommodations.map(acc => (
-                      <tr key={acc.id} className="border-t border-[#1e2537]">
-                        <td className="p-2 text-sm text-gray-300 sticky left-0 bg-[#161b2e] z-10 border-r border-[#1e2537]">{acc.title}</td>
-                        {days.map(day => {
-                          const booking = isDayBooked(day, acc.id);
-                          const isBooked = !!booking && booking.status !== 'cancelled';
-                          return (
-                            <td
-                              key={day.toISOString()}
-                              className={`p-1 min-w-[44px] ${isBooked ? 'bg-red-500/40 cursor-pointer hover:bg-red-500/60' : 'bg-[#0d1117]/50'} border border-[#1e2537]/50`}
-                              onClick={() => isBooked && setSelectedDayBooking(booking)}
-                            />
-                          );
-                        })}
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-
-            {selectedDayBooking && (
-              <div className="mt-6 p-4 bg-[#0d1117] border border-[#1e2537] rounded-xl">
-                <h4 className="text-sm font-semibold text-gray-400 mb-2">Бронирование на выбранный день</h4>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
-                  <div><span className="text-gray-500">Гость:</span> <span className="text-gray-200">{selectedDayBooking.guestName}</span></div>
-                  <div><span className="text-gray-500">Email:</span> <span className="text-gray-200">{selectedDayBooking.guestEmail}</span></div>
-                  <div><span className="text-gray-500">Номер:</span> <span className="text-gray-200">{selectedDayBooking.room}</span></div>
-                  <div><span className="text-gray-500">Даты:</span> <span className="text-gray-200">{formatDisplayDate(selectedDayBooking.checkIn)} — {formatDisplayDate(selectedDayBooking.checkOut)}</span></div>
-                  <div><span className="text-gray-500">Сумма:</span> <span className="text-gray-200">{selectedDayBooking.total} смн</span></div>
-                  <div>
-                    <button onClick={() => { handleEditBooking(selectedDayBooking); setSelectedDayBooking(null); }} className="text-blue-400 hover:underline">Редактировать</button>
                   </div>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-
-        {viewMode === 'table' && (
-          <>
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b border-[#1e2537] bg-[#0d1117]">
-                    <th className="text-left p-4 pl-6 text-xs font-semibold text-gray-400 uppercase">Гость</th>
-                    <th className="text-left p-4 text-xs font-semibold text-gray-400 uppercase">Номер</th>
-                    <th className="text-left p-4 text-xs font-semibold text-gray-400 uppercase">Заезд</th>
-                    <th className="text-left p-4 text-xs font-semibold text-gray-400 uppercase">Выезд</th>
-                    <th className="text-left p-4 text-xs font-semibold text-gray-400 uppercase">Гостей</th>
-                    <th className="text-left p-4 text-xs font-semibold text-gray-400 uppercase">Сумма</th>
-                    <th className="text-left p-4 text-xs font-semibold text-gray-400 uppercase">Статус</th>
-                    <th className="text-right p-4 pr-6 text-xs font-semibold text-gray-400 uppercase">Действия</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredBookings.map((b) => {
-                    const badge = getStatusBadge(b.status);
-                    return (
-                      <tr key={b.id} className="border-b border-[#1e2537] hover:bg-[#0d1117]">
-                        <td className="p-4 pl-6">
-                          <div>
-                            <p className="text-sm font-medium text-gray-200">{b.guestName}</p>
-                            <p className="text-xs text-gray-400">{b.guestEmail}</p>
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {displayAccommodations.length === 0 ? (
+                <tr><td colSpan={2} className="p-12 text-center text-gray-400">Нет номеров</td></tr>
+              ) : (
+                displayAccommodations.map((acc) => {
+                  const accBookings = getBookingsForAcc(acc.id).filter(b => {
+                    try {
+                      const cOut = new Date(b.checkOut);
+                      return cOut >= monthStart;
+                    } catch { return true; }
+                  });
+                  return (
+                    <tr key={acc.id} className="border-t border-[#1e2537]">
+                      <td className="py-2 px-3 text-sm text-gray-300 sticky left-0 bg-[#161b2e] z-10 border-r border-[#1e2537] font-medium">{acc.title}</td>
+                      <td className="p-0 align-middle">
+                        <div className="relative h-12" style={{ width: days.length * 48 }}>
+                          <div className="absolute inset-0 flex bg-[#0d1117]/20">
+                            {days.map(d => (
+                              <div key={d.toISOString()} className="flex-1 min-w-[48px] border-r border-[#1e2537]/30" />
+                            ))}
                           </div>
-                        </td>
-                        <td className="p-4"><span className="text-sm text-gray-300">{b.room}</span></td>
-                        <td className="p-4"><span className="text-sm text-gray-300">{formatDisplayDate(b.checkIn)}</span></td>
-                        <td className="p-4"><span className="text-sm text-gray-300">{formatDisplayDate(b.checkOut)}</span></td>
-                        <td className="p-4"><span className="text-sm text-gray-300">{b.guests}</span></td>
-                        <td className="p-4"><span className="text-sm font-semibold text-gray-200">{b.total.toLocaleString()} смн</span></td>
-                        <td className="p-4">
-                          <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-medium border ${badge.color}`}>{badge.label}</span>
-                        </td>
-                        <td className="p-4 pr-6">
-                          <button onClick={() => handleEditBooking(b)} className="p-2 hover:bg-[#1e2537] rounded-lg"><Edit2 className="w-4 h-4 text-gray-400" /></button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-            {filteredBookings.length === 0 && <p className="text-center text-gray-400 py-8">Нет бронирований</p>}
-          </>
-        )}
+                          {todayIndex >= 0 && (
+                            <div
+                              className="absolute top-0 bottom-0 w-0.5 bg-red-500 z-10 pointer-events-none"
+                              style={{ left: `${((todayIndex + 0.5) / days.length) * 100}%`, marginLeft: -1 }}
+                            />
+                          )}
+                          {accBookings.map((b, i) => {
+                            const pos = getBarPosition(b);
+                            if (pos.width <= 0) return null;
+                            const colors = ['bg-amber-500/90 hover:bg-amber-500', 'bg-blue-600/90 hover:bg-blue-600'];
+                            const color = colors[i % 2];
+                            return (
+                              <div
+                                key={b.id}
+                                className={`absolute top-1 bottom-1 rounded cursor-pointer ${color} flex items-center px-1.5 min-w-0 overflow-hidden text-white text-[11px] font-medium transition-colors`}
+                                style={{ left: `${pos.left}%`, width: `${pos.width}%` }}
+                                onClick={() => setSelectedBooking(b)}
+                                title={`${b.id.slice(0, 8)}: ${b.guestName} — ${formatDisplayDate(b.checkIn)} / ${formatDisplayDate(b.checkOut)}`}
+                              >
+                                <span className="truncate">{b.id.slice(0, 6)}: {b.guestName}</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+          {accommodations.length > 30 && (
+            <p className="p-3 text-center text-sm text-gray-500">Показано до 30 номеров</p>
+          )}
+        </div>
       </div>
+
+      {selectedBooking && (
+        <Modal isOpen={!!selectedBooking} onClose={() => setSelectedBooking(null)} title={`Бронирование #${selectedBooking.id.slice(0, 8)}`} size="lg">
+          <div className="space-y-4">
+            <div className="flex items-center justify-between flex-wrap gap-3">
+              <span className="text-gray-400 text-sm">{selectedBooking.room}</span>
+              <span className={`inline-flex px-3 py-1 rounded-full text-sm font-medium border ${getStatusBadge(selectedBooking.status).color}`}>
+                {getStatusBadge(selectedBooking.status).label}
+              </span>
+              <span className="text-xl font-bold text-emerald-400">{selectedBooking.total?.toLocale?.() ?? selectedBooking.total} смн</span>
+            </div>
+            <div className="grid grid-cols-2 gap-3 text-sm">
+              <div><span className="text-gray-500">Гость:</span> <span className="text-gray-200 font-medium">{selectedBooking.guestName}</span></div>
+              <div><span className="text-gray-500">Email:</span> <span className="text-gray-200">{selectedBooking.guestEmail}</span></div>
+              <div><span className="text-gray-500">Номер:</span> <span className="text-gray-200">{selectedBooking.room}</span></div>
+              <div><span className="text-gray-500">Гостей:</span> <span className="text-gray-200">{selectedBooking.guests}</span></div>
+            </div>
+            <div className="p-4 bg-amber-500/10 border border-amber-500/30 rounded-lg">
+              <span className="text-gray-500 text-sm">Период: </span>
+              <span className="text-amber-200 font-semibold">{formatDisplayDate(selectedBooking.checkIn)} — {formatDisplayDate(selectedBooking.checkOut)}</span>
+            </div>
+            <div className="flex justify-end gap-3 pt-2">
+              <button onClick={() => setSelectedBooking(null)} className="px-4 py-2 bg-[#161b2e] border border-[#1e2537] text-gray-300 rounded-lg hover:bg-[#1e2537]">Закрыть</button>
+              <button onClick={() => { handleEditBooking(selectedBooking); setSelectedBooking(null); }} className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg">Редактировать</button>
+            </div>
+          </div>
+        </Modal>
+      )}
 
       <Modal isOpen={isModalOpen} onClose={() => { setIsModalOpen(false); setEditingBooking(null); }} title="Редактировать бронирование" size="lg">
         {editingBooking && (

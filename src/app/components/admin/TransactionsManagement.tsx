@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Search, CreditCard, TrendingUp, Download, BarChart3 } from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
+import { Search, CreditCard, TrendingUp, Download, PieChart as PieChartIcon } from 'lucide-react';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, PieChart, Pie, Cell } from 'recharts';
 import * as XLSX from 'xlsx';
 import { adminApi } from '../../../api/backendApi';
 
@@ -30,6 +30,8 @@ function getServiceLabel(refType: string, source?: string): string {
   if (refType?.toLowerCase().includes('restaurant')) return 'Ресторан';
   return refType || 'Прочее';
 }
+
+const CHART_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4'];
 
 export function TransactionsManagement() {
   const [payments, setPayments] = useState<Payment[]>([]);
@@ -106,7 +108,7 @@ export function TransactionsManagement() {
       return acc;
     }, {} as Record<string, number>);
 
-  const chartData = Object.entries(serviceTotals).map(([name, value]) => ({ name, value }));
+  const pieByService = Object.entries(serviceTotals).map(([name, value], i) => ({ name, value, fill: CHART_COLORS[i % CHART_COLORS.length] }));
 
   const monthlyData = payments
     .filter(p => p.status === 'paid')
@@ -116,18 +118,29 @@ export function TransactionsManagement() {
         const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
         acc[key] = (acc[key] || 0) + p.amount;
         return acc;
-      } catch {
-        return acc;
-      }
+      } catch { return acc; }
     }, {} as Record<string, number>);
 
   const monthlyChartData = Object.entries(monthlyData)
     .sort(([a], [b]) => a.localeCompare(b))
     .slice(-12)
-    .map(([name, value]) => ({
-      name: name.replace('-', ' '),
-      value,
-    }));
+    .map(([name, value]) => ({ name: name.replace('-', ' '), value }));
+
+  const dailyData = payments
+    .filter(p => p.status === 'paid')
+    .reduce((acc, p) => {
+      try {
+        const d = new Date(p.createdAt);
+        const key = d.toLocaleDateString('ru-RU', { weekday: 'short' });
+        acc[key] = (acc[key] || 0) + p.amount;
+        return acc;
+      } catch { return acc; }
+    }, {} as Record<string, number>);
+
+  const pieByDay = Object.entries(dailyData)
+    .map(([name, value], i) => ({ name, value, fill: CHART_COLORS[i % CHART_COLORS.length] }))
+    .sort((a, b) => b.value - a.value)
+    .slice(0, 7);
 
   const uniqueServices = Array.from(new Set(payments.map(p => getServiceLabel(p.referenceType, p.source)))).sort();
 
@@ -141,11 +154,7 @@ export function TransactionsManagement() {
   };
 
   const formatDate = (d: string) => {
-    try {
-      return new Date(d).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', year: 'numeric' });
-    } catch {
-      return d;
-    }
+    try { return new Date(d).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', year: 'numeric' }); } catch { return d; }
   };
 
   const exportToExcel = () => {
@@ -176,75 +185,125 @@ export function TransactionsManagement() {
 
   return (
     <div className="space-y-6">
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <h2 className="text-xl font-bold text-gray-200">Бухгалтерия</h2>
+        <button
+          onClick={exportToExcel}
+          disabled={filteredPayments.length === 0}
+          className="flex items-center gap-2 px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-sm disabled:opacity-50"
+        >
+          <Download className="w-4 h-4" /> Экспорт Excel
+        </button>
+      </div>
+
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-[#161b2e] border border-[#1e2537] rounded-xl p-4">
-          <div className="flex items-center gap-2 mb-2"><CreditCard className="w-5 h-5 text-blue-400" /></div>
+          <CreditCard className="w-8 h-8 text-blue-400 mb-2" />
           <p className="text-gray-400 text-xs mb-1">Всего платежей</p>
           <p className="text-2xl font-bold text-gray-200">{payments.length}</p>
         </div>
         <div className="bg-[#161b2e] border border-[#1e2537] rounded-xl p-4">
-          <div className="flex items-center gap-2 mb-2"><TrendingUp className="w-5 h-5 text-green-400" /></div>
+          <TrendingUp className="w-8 h-8 text-green-400 mb-2" />
           <p className="text-gray-400 text-xs mb-1">Оплачено</p>
           <p className="text-2xl font-bold text-green-400">{paidCount}</p>
         </div>
         <div className="bg-[#161b2e] border border-[#1e2537] rounded-xl p-4">
-          <div className="flex items-center gap-2 mb-2"><BarChart3 className="w-5 h-5 text-emerald-400" /></div>
-          <p className="text-gray-400 text-xs mb-1">Сумма (смн)</p>
+          <PieChartIcon className="w-8 h-8 text-emerald-400 mb-2" />
+          <p className="text-gray-400 text-xs mb-1">Выручка (смн)</p>
           <p className="text-2xl font-bold text-emerald-400">{totalAmount.toLocaleString()}</p>
         </div>
-        <div className="bg-[#161b2e] border border-[#1e2537] rounded-xl p-4 flex items-center justify-between">
-          <div>
-            <p className="text-gray-400 text-xs mb-1">Экспорт</p>
-            <p className="text-sm text-gray-300">Excel</p>
-          </div>
-          <button
-            onClick={exportToExcel}
-            disabled={filteredPayments.length === 0}
-            className="p-2 bg-blue-500/20 hover:bg-blue-500/30 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <Download className="w-5 h-5 text-blue-400" />
+        <div className="bg-[#161b2e] border border-[#1e2537] rounded-xl p-4 flex items-center justify-center">
+          <button onClick={exportToExcel} disabled={filteredPayments.length === 0} className="flex flex-col items-center gap-1 disabled:opacity-50">
+            <Download className="w-8 h-8 text-blue-400" />
+            <span className="text-xs text-gray-400">Excel</span>
           </button>
         </div>
       </div>
 
-      {chartData.length > 0 && (
-        <div className="bg-[#161b2e] border border-[#1e2537] rounded-xl p-6">
-          <h3 className="text-lg font-semibold text-gray-200 mb-4">Выручка по услугам</h3>
-          <div className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={chartData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#1e2537" />
-                <XAxis dataKey="name" stroke="#6b7280" fontSize={12} />
-                <YAxis stroke="#6b7280" fontSize={12} tickFormatter={(v) => `${v}`} />
-                <Tooltip contentStyle={{ backgroundColor: '#0d1117', border: '1px solid #1e2537' }} />
-                <Bar dataKey="value" fill="#3b82f6" name="Сумма (смн)" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {pieByService.length > 0 && (
+          <div className="bg-[#161b2e] border border-[#1e2537] rounded-xl p-6">
+            <h3 className="text-base font-semibold text-gray-200 mb-4">Выручка по услугам</h3>
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={pieByService}
+                    dataKey="value"
+                    nameKey="name"
+                    cx="50%"
+                    cy="50%"
+                    outerRadius={80}
+                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                  >
+                    {pieByService.map((_, i) => <Cell key={i} fill={pieByService[i].fill} />)}
+                  </Pie>
+                  <Tooltip contentStyle={{ backgroundColor: '#0d1117', border: '1px solid #1e2537' }} formatter={(v: number) => [`${v.toLocaleString()} смн`, 'Сумма']} />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {monthlyChartData.length > 0 && (
+        {monthlyChartData.length > 0 && (
+          <div className="bg-[#161b2e] border border-[#1e2537] rounded-xl p-6">
+            <h3 className="text-base font-semibold text-gray-200 mb-4">Выручка по месяцам</h3>
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={monthlyChartData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#1e2537" />
+                  <XAxis dataKey="name" stroke="#6b7280" fontSize={11} />
+                  <YAxis stroke="#6b7280" fontSize={11} tickFormatter={(v) => `${v}`} />
+                  <Tooltip contentStyle={{ backgroundColor: '#0d1117', border: '1px solid #1e2537' }} />
+                  <Bar dataKey="value" fill="#10b981" name="Смн" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {pieByDay.length > 0 && (
+          <div className="bg-[#161b2e] border border-[#1e2537] rounded-xl p-6">
+            <h3 className="text-base font-semibold text-gray-200 mb-4">Выручка по дням недели</h3>
+            <div className="h-56">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie data={pieByDay} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={50} outerRadius={70}>
+                    {pieByDay.map((_, i) => <Cell key={i} fill={pieByDay[i].fill} />)}
+                  </Pie>
+                  <Tooltip contentStyle={{ backgroundColor: '#0d1117', border: '1px solid #1e2537' }} formatter={(v: number) => [`${v.toLocaleString()} смн`, '']} />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        )}
         <div className="bg-[#161b2e] border border-[#1e2537] rounded-xl p-6">
-          <h3 className="text-lg font-semibold text-gray-200 mb-4">Выручка по месяцам</h3>
-          <div className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={monthlyChartData} layout="vertical">
-                <CartesianGrid strokeDasharray="3 3" stroke="#1e2537" />
-                <XAxis type="number" stroke="#6b7280" fontSize={12} tickFormatter={(v) => `${v}`} />
-                <YAxis type="category" dataKey="name" stroke="#6b7280" fontSize={12} width={60} />
-                <Tooltip contentStyle={{ backgroundColor: '#0d1117', border: '1px solid #1e2537' }} />
-                <Bar dataKey="value" fill="#10b981" name="Сумма (смн)" radius={[0, 4, 4, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
+          <h3 className="text-base font-semibold text-gray-200 mb-4">Мониторинг транзакций</h3>
+          <div className="space-y-2 max-h-56 overflow-y-auto">
+            {filteredPayments.slice(0, 10).map(p => {
+              const badge = getStatusBadge(p.status);
+              return (
+                <div key={p.id} className="flex items-center justify-between py-2 px-3 bg-[#0d1117]/50 rounded-lg border border-[#1e2537]/50">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm text-gray-300 truncate">{getServiceLabel(p.referenceType, p.source)}</p>
+                    <p className="text-xs text-gray-500">{formatDate(p.createdAt)}</p>
+                  </div>
+                  <span className={`ml-2 px-2 py-0.5 rounded text-xs font-medium border ${badge.color}`}>{badge.label}</span>
+                  <span className="ml-2 text-sm font-semibold text-gray-200">{p.amount.toLocaleString()} смн</span>
+                </div>
+              );
+            })}
+            {filteredPayments.length === 0 && <p className="text-center text-gray-500 py-4">Нет транзакций</p>}
           </div>
         </div>
-      )}
+      </div>
 
       <div className="bg-[#161b2e] border border-[#1e2537] rounded-xl overflow-hidden">
-        <div className="p-6 border-b border-[#1e2537]">
+        <div className="p-4 border-b border-[#1e2537]">
           <div className="flex flex-wrap items-center justify-between gap-4">
-            <h2 className="text-xl font-bold text-gray-200">Платежи по услугам</h2>
+            <h3 className="text-lg font-semibold text-gray-200">Таблица транзакций</h3>
             <div className="flex flex-wrap items-center gap-3">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
@@ -252,7 +311,7 @@ export function TransactionsManagement() {
               </div>
               <select value={selectedService} onChange={(e) => setSelectedService(e.target.value)} className="bg-[#0d1117] border border-[#1e2537] rounded-lg px-4 py-2 text-sm text-gray-300">
                 <option value="all">Все услуги</option>
-                {uniqueServices.map(s => (<option key={s} value={s}>{s}</option>))}
+                {uniqueServices.map(s => <option key={s} value={s}>{s}</option>)}
               </select>
               <select value={selectedStatus} onChange={(e) => setSelectedStatus(e.target.value)} className="bg-[#0d1117] border border-[#1e2537] rounded-lg px-4 py-2 text-sm text-gray-300">
                 <option value="all">Все статусы</option>
@@ -260,13 +319,6 @@ export function TransactionsManagement() {
                 <option value="pending">Ожидание</option>
                 <option value="failed">Ошибка</option>
               </select>
-              <button
-                onClick={exportToExcel}
-                disabled={filteredPayments.length === 0}
-                className="flex items-center gap-2 px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-sm disabled:opacity-50"
-              >
-                <Download className="w-4 h-4" /> Экспорт Excel
-              </button>
             </div>
           </div>
         </div>
@@ -274,8 +326,8 @@ export function TransactionsManagement() {
           <table className="w-full">
             <thead>
               <tr className="border-b border-[#1e2537] bg-[#0d1117]">
-                <th className="text-left p-4 pl-6 text-xs font-semibold text-gray-400 uppercase">ID</th>
-                <th className="text-left p-4 text-xs font-semibold text-gray-400 uppercase">Услуга</th>
+                <th className="text-left p-4 pl-6 text-xs font-semibold text-gray-400 uppercase">Услуга</th>
+                <th className="text-left p-4 text-xs font-semibold text-gray-400 uppercase">ID</th>
                 <th className="text-left p-4 text-xs font-semibold text-gray-400 uppercase">Сумма</th>
                 <th className="text-left p-4 text-xs font-semibold text-gray-400 uppercase">Статус</th>
                 <th className="text-left p-4 text-xs font-semibold text-gray-400 uppercase">Дата</th>
@@ -286,14 +338,11 @@ export function TransactionsManagement() {
                 const badge = getStatusBadge(p.status);
                 return (
                   <tr key={p.id} className="border-b border-[#1e2537] hover:bg-[#0d1117]">
-                    <td className="p-4 pl-6">
-                      <p className="text-sm font-mono text-gray-300">{p.id.slice(0, 12)}...</p>
-                      <p className="text-xs text-gray-500">{p.referenceId}</p>
-                    </td>
-                    <td className="p-4"><span className="text-sm text-gray-300">{getServiceLabel(p.referenceType, p.source)}</span></td>
+                    <td className="p-4 pl-6"><span className="text-sm text-gray-300">{getServiceLabel(p.referenceType, p.source)}</span></td>
+                    <td className="p-4"><p className="text-sm font-mono text-gray-400">{p.id.slice(0, 12)}...</p></td>
                     <td className="p-4"><span className="text-sm font-semibold text-gray-200">{p.amount.toLocaleString()} {p.currency}</span></td>
                     <td className="p-4"><span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-medium border ${badge.color}`}>{badge.label}</span></td>
-                    <td className="p-4"><span className="text-sm text-gray-300">{formatDate(p.createdAt)}</span></td>
+                    <td className="p-4"><span className="text-sm text-gray-400">{formatDate(p.createdAt)}</span></td>
                   </tr>
                 );
               })}
