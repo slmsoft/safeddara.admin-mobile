@@ -1,3 +1,44 @@
+## Деплой на сервер
+
+### Быстрый деплой (Windows PowerShell)
+
+```powershell
+.\deploy\deploy-admin-mobile.ps1
+```
+
+Скрипт подключится по SSH и выполнит: `git pull` → `docker build` → `docker up -d`.  
+Требуется SSH-ключ: `$HOME\.ssh\id_rsa` (или переменная `$env:SSH_KEY`).
+
+### Ручной деплой на сервере
+
+```bash
+# 1. Подключиться
+ssh -p 3222 slmtech@193.111.11.98   # пароль: SLM@tech123
+
+# 2. Обновить и собрать
+cd /opt/safeddara-mobile
+git pull origin main
+docker compose -f docker-compose.admin.yml build --no-cache admin
+docker compose -f docker-compose.admin.yml up -d admin
+
+# 3. Проверить
+curl -I http://127.0.0.1:3003
+```
+
+### Первый раз (клонирование)
+
+```bash
+cd /opt
+sudo git clone https://github.com/slmsoft/safeddara.admin-mobile.git safeddara-mobile
+cd safeddara-mobile
+# Настроить nginx (см. deploy/README-admin-docker.md)
+docker compose -f docker-compose.admin.yml build --no-cache admin
+docker compose -f docker-compose.admin.yml up -d admin
+```
+
+**Админка:** https://adminmb.safeddara.tj/ (nginx → 127.0.0.1:3003)
+
+---
 
 ssh -p 3222 slmtech@193.111.11.98
 

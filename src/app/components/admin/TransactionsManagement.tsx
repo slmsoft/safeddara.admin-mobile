@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Search, CreditCard, TrendingUp, Download, PieChart as PieChartIcon } from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, PieChart, Pie, Cell } from 'recharts';
+import { Search, CreditCard, TrendingUp, Download, PieChart as PieChartIcon, Calendar } from 'lucide-react';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, PieChart, Pie, Cell, LabelList } from 'recharts';
 import * as XLSX from 'xlsx';
 import { adminApi } from '../../../api/backendApi';
 
@@ -31,7 +31,8 @@ function getServiceLabel(refType: string, source?: string): string {
   return refType || 'Прочее';
 }
 
-const CHART_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4'];
+const CHART_COLORS = ['#22c55e', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4'];
+const CHART_TEXT_COLORS = ['#14532d', '#1e3a8a', '#78350f', '#7f1d1d', '#4c1d95', '#164e63'];
 
 export function TransactionsManagement() {
   const [payments, setPayments] = useState<Payment[]>([]);
@@ -39,6 +40,8 @@ export function TransactionsManagement() {
   const [selectedStatus, setSelectedStatus] = useState('all');
   const [selectedService, setSelectedService] = useState('all');
   const [loading, setLoading] = useState(true);
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
 
   const loadPayments = useCallback(async () => {
     setLoading(true);
@@ -88,7 +91,17 @@ export function TransactionsManagement() {
     loadPayments();
   }, [loadPayments]);
 
-  const filteredPayments = payments.filter(p => {
+  const dateFiltered = payments.filter(p => {
+    if (!dateFrom && !dateTo) return true;
+    try {
+      const d = new Date(p.createdAt).toISOString().slice(0, 10);
+      if (dateFrom && d < dateFrom) return false;
+      if (dateTo && d > dateTo) return false;
+      return true;
+    } catch { return true; }
+  });
+
+  const filteredPayments = dateFiltered.filter(p => {
     const matchSearch = p.referenceId.toLowerCase().includes(searchQuery.toLowerCase()) ||
       p.userId.toLowerCase().includes(searchQuery.toLowerCase());
     const matchStatus = selectedStatus === 'all' || p.status === selectedStatus;
@@ -97,10 +110,10 @@ export function TransactionsManagement() {
     return matchSearch && matchStatus && matchService;
   });
 
-  const totalAmount = payments.filter(p => p.status === 'paid').reduce((sum, p) => sum + p.amount, 0);
-  const paidCount = payments.filter(p => p.status === 'paid').length;
+  const totalAmount = filteredPayments.filter(p => p.status === 'paid').reduce((sum, p) => sum + p.amount, 0);
+  const paidCount = filteredPayments.filter(p => p.status === 'paid').length;
 
-  const serviceTotals = payments
+  const serviceTotals = filteredPayments
     .filter(p => p.status === 'paid')
     .reduce((acc, p) => {
       const label = getServiceLabel(p.referenceType, p.source);
@@ -108,9 +121,14 @@ export function TransactionsManagement() {
       return acc;
     }, {} as Record<string, number>);
 
-  const pieByService = Object.entries(serviceTotals).map(([name, value], i) => ({ name, value, fill: CHART_COLORS[i % CHART_COLORS.length] }));
+  const pieByService = Object.entries(serviceTotals).map(([name, value], i) => ({
+    name,
+    value,
+    fill: CHART_COLORS[i % CHART_COLORS.length],
+    textFill: CHART_TEXT_COLORS[i % CHART_TEXT_COLORS.length],
+  }));
 
-  const monthlyData = payments
+  const monthlyData = filteredPayments
     .filter(p => p.status === 'paid')
     .reduce((acc, p) => {
       try {
@@ -126,7 +144,7 @@ export function TransactionsManagement() {
     .slice(-12)
     .map(([name, value]) => ({ name: name.replace('-', ' '), value }));
 
-  const dailyData = payments
+  const dailyData = filteredPayments
     .filter(p => p.status === 'paid')
     .reduce((acc, p) => {
       try {
@@ -138,7 +156,12 @@ export function TransactionsManagement() {
     }, {} as Record<string, number>);
 
   const pieByDay = Object.entries(dailyData)
-    .map(([name, value], i) => ({ name, value, fill: CHART_COLORS[i % CHART_COLORS.length] }))
+    .map(([name, value], i) => ({
+      name,
+      value,
+      fill: CHART_COLORS[i % CHART_COLORS.length],
+      textFill: CHART_TEXT_COLORS[i % CHART_TEXT_COLORS.length],
+    }))
     .sort((a, b) => b.value - a.value)
     .slice(0, 7);
 
@@ -154,11 +177,13 @@ export function TransactionsManagement() {
   };
 
   const formatDate = (d: string) => {
-    try { return new Date(d).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', year: 'numeric' }); } catch { return d; }
+    try { return new Date(d).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }); } catch { return d; }
   };
 
-  const exportToExcel = () => {
-    const rows = filteredPayments.map(p => ({
+  const exportToExcel = (detailed = false) => {
+    const sorted = [...filteredPayments].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+    const rows = sorted.map(p => ({
+      '№': sorted.indexOf(p) + 1,
       ID: p.id,
       'Тип услуги': getServiceLabel(p.referenceType, p.source),
       'ID заказа': p.referenceId,
@@ -172,7 +197,34 @@ export function TransactionsManagement() {
     const ws = XLSX.utils.json_to_sheet(rows);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Транзакции');
-    XLSX.writeFile(wb, `transactions_${new Date().toISOString().slice(0, 10)}.xlsx`);
+
+    if (detailed) {
+      const summary = [
+        { Показатель: 'Период', Значение: (dateFrom || '—') + ' — ' + (dateTo || '—') },
+        { Показатель: 'Всего транзакций', Значение: filteredPayments.length },
+        { Показатель: 'Оплачено', Значение: paidCount },
+        { Показатель: 'Итого выручка (смн)', Значение: totalAmount.toLocaleString() },
+        { Показатель: 'По услугам', Значение: '' },
+        ...Object.entries(serviceTotals).map(([k, v]) => ({ Показатель: '  ' + k, Значение: v.toLocaleString() })),
+      ];
+      const wsSummary = XLSX.utils.json_to_sheet(summary);
+      XLSX.utils.book_append_sheet(wb, wsSummary, 'Итоги');
+    }
+
+    const period = (dateFrom || dateTo) ? `_${dateFrom || 'start'}-${dateTo || 'end'}` : '';
+    XLSX.writeFile(wb, `transactions${period}_${new Date().toISOString().slice(0, 10)}.xlsx`);
+  };
+
+  const CustomPieLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent, name, fill }: any) => {
+    const RADIAN = Math.PI / 180;
+    const radius = outerRadius + 20;
+    const x = cx + radius * Math.cos(-midAngle * RADIAN);
+    const y = cy + radius * Math.sin(-midAngle * RADIAN);
+    return (
+      <text x={x} y={y} fill="#e5e7eb" textAnchor={x > cx ? 'start' : 'end'} dominantBaseline="central" fontSize={12} fontWeight={600}>
+        {name} {(percent * 100).toFixed(0)}%
+      </text>
+    );
   };
 
   if (loading) {
@@ -187,20 +239,27 @@ export function TransactionsManagement() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <h2 className="text-xl font-bold text-gray-200">Бухгалтерия</h2>
-        <button
-          onClick={exportToExcel}
-          disabled={filteredPayments.length === 0}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-sm disabled:opacity-50"
-        >
-          <Download className="w-4 h-4" /> Экспорт Excel
-        </button>
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex items-center gap-2">
+            <Calendar className="w-4 h-4 text-gray-400" />
+            <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="bg-[#0d1117] border border-[#1e2537] rounded-lg px-3 py-1.5 text-sm text-gray-300" />
+            <span className="text-gray-500">—</span>
+            <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="bg-[#0d1117] border border-[#1e2537] rounded-lg px-3 py-1.5 text-sm text-gray-300" />
+          </div>
+          <button onClick={() => exportToExcel(true)} disabled={filteredPayments.length === 0} className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm disabled:opacity-50">
+            <Download className="w-4 h-4" /> Подробный отчёт
+          </button>
+          <button onClick={() => exportToExcel(false)} disabled={filteredPayments.length === 0} className="flex items-center gap-2 px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-sm disabled:opacity-50">
+            <Download className="w-4 h-4" /> Excel
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-[#161b2e] border border-[#1e2537] rounded-xl p-4">
           <CreditCard className="w-8 h-8 text-blue-400 mb-2" />
-          <p className="text-gray-400 text-xs mb-1">Всего платежей</p>
-          <p className="text-2xl font-bold text-gray-200">{payments.length}</p>
+          <p className="text-gray-400 text-xs mb-1">Платежей за период</p>
+          <p className="text-2xl font-bold text-gray-200">{filteredPayments.length}</p>
         </div>
         <div className="bg-[#161b2e] border border-[#1e2537] rounded-xl p-4">
           <TrendingUp className="w-8 h-8 text-green-400 mb-2" />
@@ -213,9 +272,9 @@ export function TransactionsManagement() {
           <p className="text-2xl font-bold text-emerald-400">{totalAmount.toLocaleString()}</p>
         </div>
         <div className="bg-[#161b2e] border border-[#1e2537] rounded-xl p-4 flex items-center justify-center">
-          <button onClick={exportToExcel} disabled={filteredPayments.length === 0} className="flex flex-col items-center gap-1 disabled:opacity-50">
+          <button onClick={() => exportToExcel(true)} disabled={filteredPayments.length === 0} className="flex flex-col items-center gap-1 disabled:opacity-50">
             <Download className="w-8 h-8 text-blue-400" />
-            <span className="text-xs text-gray-400">Excel</span>
+            <span className="text-xs text-gray-400">Отчёт</span>
           </button>
         </div>
       </div>
@@ -227,18 +286,10 @@ export function TransactionsManagement() {
             <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
-                  <Pie
-                    data={pieByService}
-                    dataKey="value"
-                    nameKey="name"
-                    cx="50%"
-                    cy="50%"
-                    outerRadius={80}
-                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                  >
-                    {pieByService.map((_, i) => <Cell key={i} fill={pieByService[i].fill} />)}
+                  <Pie data={pieByService} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} label={CustomPieLabel} labelLine={false}>
+                    {pieByService.map((_, i) => <Cell key={i} fill={pieByService[i].fill} stroke="#1e2537" strokeWidth={2} />)}
                   </Pie>
-                  <Tooltip contentStyle={{ backgroundColor: '#0d1117', border: '1px solid #1e2537' }} formatter={(v: number) => [`${v.toLocaleString()} смн`, 'Сумма']} />
+                  <Tooltip contentStyle={{ backgroundColor: '#0d1117', border: '1px solid #1e2537', color: '#e5e7eb' }} formatter={(v: number) => [`${v.toLocaleString()} смн`, 'Сумма']} />
                 </PieChart>
               </ResponsiveContainer>
             </div>
@@ -252,10 +303,12 @@ export function TransactionsManagement() {
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={monthlyChartData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#1e2537" />
-                  <XAxis dataKey="name" stroke="#6b7280" fontSize={11} />
-                  <YAxis stroke="#6b7280" fontSize={11} tickFormatter={(v) => `${v}`} />
-                  <Tooltip contentStyle={{ backgroundColor: '#0d1117', border: '1px solid #1e2537' }} />
-                  <Bar dataKey="value" fill="#10b981" name="Смн" radius={[4, 4, 0, 0]} />
+                  <XAxis dataKey="name" stroke="#94a3b8" fontSize={12} tick={{ fill: '#e2e8f0' }} />
+                  <YAxis stroke="#94a3b8" fontSize={12} tick={{ fill: '#e2e8f0' }} tickFormatter={(v) => `${v}`} />
+                  <Tooltip contentStyle={{ backgroundColor: '#0d1117', border: '1px solid #1e2537', color: '#e5e7eb' }} />
+                  <Bar dataKey="value" fill="#22c55e" name="Смн" radius={[4, 4, 0, 0]}>
+                    <LabelList dataKey="value" position="top" fill="#e2e8f0" fontSize={11} formatter={(v: number) => v.toLocaleString()} />
+                  </Bar>
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -266,14 +319,14 @@ export function TransactionsManagement() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {pieByDay.length > 0 && (
           <div className="bg-[#161b2e] border border-[#1e2537] rounded-xl p-6">
-            <h3 className="text-base font-semibold text-gray-200 mb-4">Выручка по дням недели</h3>
+            <h3 className="text-base font-semibold text-gray-200 mb-4">По дням недели</h3>
             <div className="h-56">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
-                  <Pie data={pieByDay} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={50} outerRadius={70}>
-                    {pieByDay.map((_, i) => <Cell key={i} fill={pieByDay[i].fill} />)}
+                  <Pie data={pieByDay} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={50} outerRadius={70} label={CustomPieLabel} labelLine={false}>
+                    {pieByDay.map((_, i) => <Cell key={i} fill={pieByDay[i].fill} stroke="#1e2537" strokeWidth={2} />)}
                   </Pie>
-                  <Tooltip contentStyle={{ backgroundColor: '#0d1117', border: '1px solid #1e2537' }} formatter={(v: number) => [`${v.toLocaleString()} смн`, '']} />
+                  <Tooltip contentStyle={{ backgroundColor: '#0d1117', border: '1px solid #1e2537', color: '#e5e7eb' }} formatter={(v: number) => [`${v.toLocaleString()} смн`, '']} />
                 </PieChart>
               </ResponsiveContainer>
             </div>
@@ -295,7 +348,7 @@ export function TransactionsManagement() {
                 </div>
               );
             })}
-            {filteredPayments.length === 0 && <p className="text-center text-gray-500 py-4">Нет транзакций</p>}
+            {filteredPayments.length === 0 && <p className="text-center text-gray-500 py-4">Нет транзакций за период</p>}
           </div>
         </div>
       </div>
@@ -303,7 +356,7 @@ export function TransactionsManagement() {
       <div className="bg-[#161b2e] border border-[#1e2537] rounded-xl overflow-hidden">
         <div className="p-4 border-b border-[#1e2537]">
           <div className="flex flex-wrap items-center justify-between gap-4">
-            <h3 className="text-lg font-semibold text-gray-200">Таблица транзакций</h3>
+            <h3 className="text-lg font-semibold text-gray-200">Таблица (сортировка по дате)</h3>
             <div className="flex flex-wrap items-center gap-3">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
@@ -334,7 +387,7 @@ export function TransactionsManagement() {
               </tr>
             </thead>
             <tbody>
-              {filteredPayments.map((p) => {
+              {[...filteredPayments].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()).map((p) => {
                 const badge = getStatusBadge(p.status);
                 return (
                   <tr key={p.id} className="border-b border-[#1e2537] hover:bg-[#0d1117]">

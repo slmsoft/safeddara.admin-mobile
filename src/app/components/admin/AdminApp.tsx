@@ -5,6 +5,7 @@ import { AdminDashboard } from './AdminDashboard';
 import { UsersManagement } from './UsersManagement';
 import { HotelsManagement } from './HotelsManagement';
 import { BookingsManagement } from './BookingsManagement';
+import { BookingsSummary } from './BookingsSummary';
 import { ServicesManagement } from './ServicesManagement';
 import { RestaurantManagement } from './RestaurantManagement';
 import { NewsManagement } from './NewsManagement';
@@ -95,7 +96,7 @@ export function AdminApp() {
       case 'users':
         return <UsersManagement />;
       case 'bookings':
-        return <BookingsManagement />;
+        return currentUser.role === 'accountant' ? <BookingsSummary /> : <BookingsManagement />;
       case 'transactions':
         return <TransactionsManagement />;
       case 'hotels':
