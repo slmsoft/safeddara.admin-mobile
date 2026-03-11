@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Search, ShoppingCart, Package, CheckCircle, XCircle, Clock, Edit2, Trash2, Plus, Save, X } from 'lucide-react';
-import { Modal } from './Modal';
+import { Search, ShoppingCart, CheckCircle, XCircle, Clock } from 'lucide-react';
 import { adminApi } from '../../../api/backendApi';
 
 interface Order {
@@ -35,8 +34,6 @@ export function OrdersManagement() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedStatus, setSelectedStatus] = useState('all');
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingOrder, setEditingOrder] = useState<Order | null>(null);
 
   const loadOrders = useCallback(async () => {
     setLoading(true);
@@ -115,51 +112,6 @@ export function OrdersManagement() {
     return badges[status as keyof typeof badges] || badges.processing;
   };
 
-  const handleAddOrder = () => {
-    const newOrder: Order = {
-      id: Date.now().toString(),
-      customerName: '',
-      customerEmail: '',
-      items: '',
-      quantity: 1,
-      total: 0,
-      date: new Date().toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', year: 'numeric' }),
-      status: 'processing',
-      avatar: `https://i.pravatar.cc/150?img=${Math.floor(Math.random() * 70)}`
-    };
-    setEditingOrder(newOrder);
-    setIsModalOpen(true);
-  };
-
-  const handleEditOrder = (order: Order) => {
-    setEditingOrder({ ...order });
-    setIsModalOpen(true);
-  };
-
-  const handleSaveOrder = () => {
-    if (!editingOrder) return;
-    
-    if (!editingOrder.customerName || !editingOrder.customerEmail || !editingOrder.items) {
-      alert('Пожалуйста, заполните все обязательные поля');
-      return;
-    }
-
-    if (editingOrder.id && orders.find(o => o.id === editingOrder.id)) {
-      setOrders(orders.map(o => o.id === editingOrder.id ? editingOrder : o));
-    } else {
-      setOrders([...orders, editingOrder]);
-    }
-    
-    setIsModalOpen(false);
-    setEditingOrder(null);
-  };
-
-  const handleDeleteOrder = (id: string) => {
-    if (confirm('Вы уверены, что хотите удалить этот заказ?')) {
-      setOrders(orders.filter(o => o.id !== id));
-    }
-  };
-
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
@@ -170,8 +122,7 @@ export function OrdersManagement() {
 
   return (
     <div className="space-y-6">
-      {/* Stats Cards */}
-      <div className="grid grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         {stats.map((stat, index) => (
           <div key={index} className="bg-[#161b2e] border border-[#1e2537] rounded-xl p-4">
             <div className="flex items-center justify-between mb-2">
@@ -185,13 +136,12 @@ export function OrdersManagement() {
         ))}
       </div>
 
-      {/* Orders Table */}
       <div className="bg-[#161b2e] border border-[#1e2537] rounded-xl overflow-hidden">
         <div className="p-6 border-b border-[#1e2537]">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
               <h2 className="text-xl font-bold text-gray-200">Все заказы</h2>
-              <p className="text-sm text-gray-400 mt-1">1 - {filteredOrders.length} из {orders.length}</p>
+              <p className="text-sm text-gray-400 mt-1">1 — {filteredOrders.length} из {orders.length}</p>
             </div>
             <div className="flex items-center gap-4">
               <div className="relative">
@@ -261,22 +211,6 @@ export function OrdersManagement() {
                         {statusBadge.label}
                       </span>
                     </td>
-                    <td className="p-4 pr-6">
-                      <div className="flex items-center justify-end gap-2">
-                        <button 
-                          onClick={() => handleEditOrder(order)}
-                          className="p-2 hover:bg-[#1e2537] rounded-lg transition-colors"
-                        >
-                          <Edit2 className="w-4 h-4 text-gray-400" />
-                        </button>
-                        <button 
-                          onClick={() => handleDeleteOrder(order.id)}
-                          className="p-2 hover:bg-red-500/10 rounded-lg transition-colors"
-                        >
-                          <Trash2 className="w-4 h-4 text-gray-400 hover:text-red-400" />
-                        </button>
-                      </div>
-                    </td>
                   </tr>
                 );
               })}
@@ -284,148 +218,8 @@ export function OrdersManagement() {
           </table>
         </div>
 
-        <div className="p-4 border-t border-[#1e2537] flex items-center justify-between bg-[#0d1117]">
-          <p className="text-sm text-gray-400">Показано {filteredOrders.length} из {orders.length}</p>
-          <div className="flex gap-2">
-            <button disabled className="px-3 py-1.5 bg-[#161b2e] border border-[#1e2537] text-gray-500 rounded-lg text-sm cursor-not-allowed">
-              Назад
-            </button>
-            <button disabled className="px-3 py-1.5 bg-[#161b2e] border border-[#1e2537] text-gray-500 rounded-lg text-sm cursor-not-allowed">
-              Далее
-            </button>
-          </div>
-        </div>
+        {filteredOrders.length === 0 && <p className="text-center text-gray-400 py-8">Нет заказов</p>}
       </div>
-
-      {/* Add/Edit Order Modal */}
-      <Modal
-        isOpen={isModalOpen}
-        onClose={() => {
-          setIsModalOpen(false);
-          setEditingOrder(null);
-        }}
-        title={editingOrder?.id && orders.find(o => o.id === editingOrder.id) ? 'Редактировать заказ' : 'Добавить заказ'}
-        size="lg"
-      >
-        {editingOrder && (
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">
-                Имя клиента *
-              </label>
-              <input
-                type="text"
-                value={editingOrder.customerName}
-                onChange={(e) => setEditingOrder({ ...editingOrder, customerName: e.target.value })}
-                className="w-full bg-[#0d1117] border border-[#1e2537] rounded-lg px-4 py-2 text-gray-200 focus:outline-none focus:border-blue-500"
-                placeholder="Введите имя"
-              />
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">
-                Email *
-              </label>
-              <input
-                type="email"
-                value={editingOrder.customerEmail}
-                onChange={(e) => setEditingOrder({ ...editingOrder, customerEmail: e.target.value })}
-                className="w-full bg-[#0d1117] border border-[#1e2537] rounded-lg px-4 py-2 text-gray-200 focus:outline-none focus:border-blue-500"
-                placeholder="email@example.com"
-              />
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">
-                Товары/Услуги *
-              </label>
-              <input
-                type="text"
-                value={editingOrder.items}
-                onChange={(e) => setEditingOrder({ ...editingOrder, items: e.target.value })}
-                className="w-full bg-[#0d1117] border border-[#1e2537] rounded-lg px-4 py-2 text-gray-200 focus:outline-none focus:border-blue-500"
-                placeholder="Описание товаров или услуг"
-              />
-            </div>
-            
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
-                  Количество
-                </label>
-                <input
-                  type="number"
-                  min="1"
-                  value={editingOrder.quantity}
-                  onChange={(e) => setEditingOrder({ ...editingOrder, quantity: parseInt(e.target.value) || 1 })}
-                  className="w-full bg-[#0d1117] border border-[#1e2537] rounded-lg px-4 py-2 text-gray-200 focus:outline-none focus:border-blue-500"
-                />
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
-                  Сумма (смн)
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  value={editingOrder.total}
-                  onChange={(e) => setEditingOrder({ ...editingOrder, total: parseInt(e.target.value) || 0 })}
-                  className="w-full bg-[#0d1117] border border-[#1e2537] rounded-lg px-4 py-2 text-gray-200 focus:outline-none focus:border-blue-500"
-                />
-              </div>
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">
-                Дата
-              </label>
-              <input
-                type="text"
-                value={editingOrder.date}
-                onChange={(e) => setEditingOrder({ ...editingOrder, date: e.target.value })}
-                className="w-full bg-[#0d1117] border border-[#1e2537] rounded-lg px-4 py-2 text-gray-200 focus:outline-none focus:border-blue-500"
-                placeholder="12 янв 2026"
-              />
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">
-                Статус
-              </label>
-              <select
-                value={editingOrder.status}
-                onChange={(e) => setEditingOrder({ ...editingOrder, status: e.target.value as Order['status'] })}
-                className="w-full bg-[#0d1117] border border-[#1e2537] rounded-lg px-4 py-2 text-gray-200 focus:outline-none focus:border-blue-500"
-              >
-                <option value="processing">Обработка</option>
-                <option value="completed">Выполнен</option>
-                <option value="cancelled">Отменён</option>
-              </select>
-            </div>
-            
-            <div className="flex justify-end gap-3 pt-4 border-t border-[#1e2537]">
-              <button
-                onClick={() => {
-                  setIsModalOpen(false);
-                  setEditingOrder(null);
-                }}
-                className="px-4 py-2 bg-[#161b2e] hover:bg-[#1e2537] border border-[#1e2537] text-gray-300 rounded-lg transition-colors flex items-center gap-2"
-              >
-                <X className="w-4 h-4" />
-                Отмена
-              </button>
-              <button
-                onClick={handleSaveOrder}
-                className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors flex items-center gap-2"
-              >
-                <Save className="w-4 h-4" />
-                Сохранить
-              </button>
-            </div>
-          </div>
-        )}
-      </Modal>
     </div>
   );
 }

@@ -245,7 +245,9 @@ export const adminApi = {
     deleteItem: (id: string) => adminFetch(`/restaurants/items/${id}`, { method: 'DELETE' }),
   },
   bookings: {
-    list: () => adminFetch<{ bookings: Array<{ id: string; guestName: string; guestEmail: string; accommodation: { title: string }; checkIn: string; checkOut: string; guests: number; totalPrice: number; status: string }> }>('/bookings'),
+    list: () => adminFetch<{ bookings: Array<{ id: string; guestName: string; guestEmail: string; accommodation: { id?: string; title: string }; checkIn: string; checkOut: string; guests: number; totalPrice: number; status: string }> }>('/bookings'),
+    create: (body: { accommodationId: string; checkIn: string; checkOut: string; guests: number; guestName: string; guestEmail: string }) =>
+      adminFetch<{ booking: unknown }>('/bookings', { method: 'POST', body: JSON.stringify(body) }),
     update: (id: string, body: { status?: string }) =>
       adminFetch<{ booking: unknown }>(`/bookings/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
   },

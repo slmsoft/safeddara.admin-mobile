@@ -42,11 +42,7 @@ export function RestaurantMenuPage({ onBack, onWeatherClick, onLiveClick, initia
             seen.add(key);
             return true;
           });
-          const apiCatList = uniqueCats.map((c) => ({ id: `cat-${c.id}`, title: c.title }));
-          const extraTitles = ['Ужин', 'Десерты'];
-          const added = new Set(apiCatList.map((c) => c.title.toLowerCase()));
-          const extras = extraTitles.filter((t) => !added.has(t.toLowerCase())).map((t, i) => ({ id: `extra-${i}`, title: t }));
-          const catList = [{ id: 'all', title: 'Все' }, ...apiCatList, ...extras];
+          const catList = [{ id: 'all', title: 'Все' }, ...uniqueCats.map((c) => ({ id: `cat-${c.id}`, title: c.title }))];
           setCategories(catList);
           const items: MenuItem[] = cats.flatMap((c) =>
             c.items.map((i) => ({
@@ -58,25 +54,7 @@ export function RestaurantMenuPage({ onBack, onWeatherClick, onLiveClick, initia
               category: c.title,
             }))
           );
-          // Моки для Ужин и Десерты, если их нет с API
-          const mockУжин: MenuItem[] = [
-            { id: 'mock-u1', name: 'Стейк из лосося', description: '', price: 180, image: 'https://images.unsplash.com/photo-1467003909585-2f8a72700288?w=400', category: 'Ужин' },
-            { id: 'mock-u2', name: 'Ризотто с грибами', description: '', price: 95, image: 'https://images.unsplash.com/photo-1476124369491-e7addf5db371?w=400', category: 'Ужин' },
-            { id: 'mock-u3', name: 'Куриное филе с овощами', description: '', price: 75, image: 'https://images.unsplash.com/photo-1598103442097-8b74394b95c6?w=400', category: 'Ужин' },
-          ];
-          const mockДесерты: MenuItem[] = [
-            { id: 'mock-d1', name: 'Тирамису', description: '', price: 85, image: 'https://images.unsplash.com/photo-1571877227200-a0d98ea607e9?w=400', category: 'Десерты' },
-            { id: 'mock-d2', name: 'Чизкейк Нью-Йорк', description: '', price: 70, image: 'https://images.unsplash.com/photo-1565958011703-44f9829ba187?w=400', category: 'Десерты' },
-            { id: 'mock-d3', name: 'Панна-котта с ягодами', description: '', price: 65, image: 'https://images.unsplash.com/photo-1488477181946-6428a0291777?w=400', category: 'Десерты' },
-          ];
-          const hasУжин = items.some((i) => i.category === 'Ужин');
-          const hasДесерты = items.some((i) => i.category === 'Десерты');
-          const allItems = [
-            ...items,
-            ...(hasУжин ? [] : mockУжин),
-            ...(hasДесерты ? [] : mockДесерты),
-          ];
-          setMenuItems(allItems);
+          setMenuItems(items);
           if (initialCategory && catList.some((c) => c.title === initialCategory)) {
             setSelectedCategory(initialCategory);
           }
